@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>图片库</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+    <style>
+        body {
+            background: #f5f3ff;
+            font-family: Inter, sans-serif;
+        }
+        .grid-item {
+            break-inside: avoid;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .grid-item:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .grid-item img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        /* lightbox */
+        #lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+        #lightbox.open { display: flex; }
+        #lightbox img {
+            max-width: 95vw;
+            max-height: 92vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        }
+        #lightbox .close {
+            position: absolute;
+            top: 16px;
+            right: 24px;
+            color: #fff;
+            font-size: 32px;
+            cursor: pointer;
+            opacity: 0.7;
+            background: none;
+            border: none;
+        }
+        #lightbox .close:hover { opacity: 1; }
+        .loading {
+            text-align: center;
+            padding: 60px 0;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">图片库</h1>
+        <p class="text-sm text-gray-500 mb-6" id="imageCount">加载中...</p>
+        <div id="grid" class="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-3"></div>
+        <div class="loading" id="loading">加载中...</div>
+    </div>
+
+    <div id="lightbox" onclick="closeLightbox()">
+        <button class="close" onclick="closeLightbox()">&times;</button>
+        <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()"/>
+    </div>
+
+    <script>
+        async function loadImages() {
+            const grid = document.getElementById('grid');
+            const loading = document.getElementById('loading');
+            try {
+                const res = await fetch('/api/images');
+                const data = await res.json();
+                loading.style.display = 'none';
+                if (data.error) {
+                    grid.innerHTML = `<p class="text-gray-500">${data.error}</p>`;
+                    return;
+                }
+                const images = data.images || [];
+                document.getElementById('imageCount').textContent =
+                    images.length > 0 ? `共 ${images.length} 张图片` : '暂无图片';
+
+                images.forEach(img => {
+                    const div = document.createElement('div');
+                    div.className = 'grid-item';
+                    div.onclick = () => showLightbox(img.proxy_url);
+                    const imgEl = document.createElement('img');
+                    imgEl.loading = 'lazy';
+                    imgEl.src = img.thumb_url;
+                    imgEl.alt = img.name;
+                    div.appendChild(imgEl);
+                    grid.appendChild(div);
+                });
+            } catch (e) {
+                loading.textContent = '加载失败';
+            }
+        }
+
+        function showLightbox(url) {
+            document.getElementById('lightboxImg').src = url;
+            document.getElementById('lightbox').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('open');
+            document.getElementById('lightboxImg').src = '';
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeLightbox();
+        });
+
+        loadImages();
+    </script>
+</body>
+</html>

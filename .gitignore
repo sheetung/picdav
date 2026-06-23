@@ -21,11 +21,15 @@ Thumbs.db
 
 # Config with secrets
 config/*.json
+config/.encryption_key
 
 # Environment
 .env
 .env.local
 .env.*
+
+# Claude Code
+.claude/
 
 # Logs
 *.log

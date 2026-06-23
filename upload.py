@@ -1,112 +1,25 @@
-#!/usr/bin/env python3
-"""图片上传工具 - 独立版"""
+"""图片上传与管理服务 - 完整功能 (端口 5001，内部使用)"""
 
-import json
-import hashlib
-import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
-from flask import Flask, request, jsonify, Response, render_template, send_from_directory
-from PIL import Image
 import requests
 from requests.auth import HTTPBasicAuth
-from cryptography.fernet import Fernet
-import io
+from flask import Flask, request, jsonify, Response, render_template
+
+from common import load_config, save_config, generate_filename, upload_to_webdav
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
-
-CONFIG_FILE = Path(__file__).parent / "config" / "image_uploader.json"
-KEY_FILE = Path(__file__).parent / "config" / ".encryption_key"
-
-
-def _get_cipher():
-    if KEY_FILE.exists():
-        key = KEY_FILE.read_bytes()
-    else:
-        key = Fernet.generate_key()
-        KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-        KEY_FILE.write_bytes(key)
-    return Fernet(key)
-
-
-def encrypt_password(password):
-    if not password:
-        return ""
-    return _get_cipher().encrypt(password.encode()).decode()
-
-
-def decrypt_password(encrypted):
-    if not encrypted:
-        return ""
-    try:
-        return _get_cipher().decrypt(encrypted.encode()).decode()
-    except Exception:
-        return None  # 非加密数据或密钥无效
-
-
-def load_config():
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        password = config.get("password", "")
-        if password:
-            decrypted = decrypt_password(password)
-            if decrypted is not None:
-                config["password"] = decrypted
-        return config
-    return {}
-
-
-def save_config(config):
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    password = config.get("password", "")
-    if password:
-        config["password"] = encrypt_password(password)
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-
-
-def generate_filename(image_data):
-    date_str = datetime.now().strftime("%Y%m%d")
-    content_hash = hashlib.md5(image_data).hexdigest()[:12]
-    return f"{date_str}-{content_hash}.png"
-
-
-def upload_to_webdav(image_data, filename, config):
-    server_url = config.get("server_url", "").rstrip("/")
-    username = config.get("username", "")
-    password = config.get("password", "")
-    remote_path = config.get("remote_path", "/Images/").strip("/")
-
-    if not server_url:
-        raise ValueError("请先配置WebDAV服务器地址")
-
-    upload_url = f"{server_url}/{remote_path}/{filename}"
-
-    dir_url = f"{server_url}/{remote_path}/"
-    try:
-        requests.request("MKCOL", dir_url, auth=HTTPBasicAuth(username, password), timeout=10)
-    except Exception:
-        pass
-
-    response = requests.put(
-        upload_url, data=image_data,
-        auth=HTTPBasicAuth(username, password),
-        headers={"Content-Type": "image/png"}, timeout=30
-    )
-
-    if response.status_code not in (200, 201, 204):
-        raise Exception(f"上传失败: HTTP {response.status_code}")
-
-    return upload_url
 
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+# ── 配置 ──
 
 @app.route('/api/image/config', methods=['GET'])
 def get_config():
@@ -119,13 +32,14 @@ def get_config():
 @app.route('/api/image/config', methods=['POST'])
 def update_config():
     new_config = request.json
-    # 如果密码是掩码或空，保留现有密码
     if new_config.get("password") in (None, "", "********"):
         existing = load_config()
         new_config["password"] = existing.get("password", "")
     save_config(new_config)
     return jsonify({"status": "ok"})
 
+
+# ── 上传 ──
 
 @app.route('/api/image/upload', methods=['POST'])
 def upload():
@@ -166,9 +80,10 @@ def upload():
         return jsonify({"error": str(e)}), 500
 
 
+# ── 图片列表 ──
+
 @app.route('/api/image/list', methods=['GET'])
 def list_files():
-    """列出WebDAV目录下的图片文件"""
     try:
         config = load_config()
         server_url = config.get("server_url", "").rstrip("/")
@@ -180,7 +95,6 @@ def list_files():
             return jsonify({"error": "请先配置WebDAV"}), 400
 
         dir_url = f"{server_url}/{remote_path}/"
-
         headers = {"Depth": "1", "Content-Type": "application/xml"}
         body = """<?xml version="1.0" encoding="utf-8"?>
         <D:propfind xmlns:D="DAV:">
@@ -192,8 +106,7 @@ def list_files():
         </D:propfind>"""
 
         response = requests.request(
-            "PROPFIND", dir_url,
-            data=body, headers=headers,
+            "PROPFIND", dir_url, data=body, headers=headers,
             auth=HTTPBasicAuth(username, password), timeout=30
         )
 
@@ -202,7 +115,6 @@ def list_files():
 
         root = ET.fromstring(response.text)
         ns = {'D': 'DAV:'}
-
         files = []
         image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'}
 
@@ -210,18 +122,14 @@ def list_files():
             href = response_elem.find('.//D:href', ns)
             if href is None:
                 continue
-            href_text = href.text
-            filename = href_text.rstrip('/').split('/')[-1]
-            ext = Path(filename).suffix.lower()
-            if ext not in image_exts:
+            filename = href.text.rstrip('/').split('/')[-1]
+            if Path(filename).suffix.lower() not in image_exts:
                 continue
 
             content_length = response_elem.find('.//D:getcontentlength', ns)
             size = int(content_length.text) if content_length is not None else 0
-
             last_modified = response_elem.find('.//D:getlastmodified', ns)
             mtime = last_modified.text if last_modified is not None else ""
-
             file_url = f"{server_url}/{remote_path}/{filename}"
             files.append({"name": filename, "url": file_url, "size": size, "modified": mtime})
 
@@ -230,6 +138,8 @@ def list_files():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ── 删除 ──
 
 @app.route('/api/image/delete', methods=['POST'])
 def delete_file():
@@ -251,6 +161,8 @@ def delete_file():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ── 图片代理 ──
 
 @app.route('/api/image/proxy', methods=['GET'])
 def proxy_image():
@@ -277,4 +189,4 @@ def proxy_image():
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5001, debug=True)
