@@ -13,6 +13,21 @@
 
 ## 快速开始
 
+### 使用 uv（推荐）
+
+```bash
+# 创建虚拟环境并安装依赖
+uv sync
+
+# 终端 1：展示页 (http://localhost:5000)
+uv run python gallery.py
+
+# 终端 2：管理端 (http://localhost:5001)
+uv run python upload.py
+```
+
+### 使用 pip
+
 ```bash
 pip install -r requirements.txt
 

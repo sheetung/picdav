@@ -189,4 +189,4 @@ def proxy_image():
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5001, debug=True)
+    app.run(host='192.168.31.238', port=5001, debug=True)

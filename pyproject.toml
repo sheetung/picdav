@@ -1,0 +1,11 @@
+[project]
+name = "image-uploader-yun"
+version = "1.0.0"
+description = "基于 WebDAV 的图片上传与管理工具"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0.0",
+    "Pillow>=10.0.0",
+    "requests>=2.31.0",
+    "cryptography>=41.0.0",
+]
