@@ -728,12 +728,31 @@
                 div.className = 'masonry-item group border border-white/40 rounded-lg overflow-hidden bg-white/20 cursor-pointer';
                 div.style.width = itemWidth + 'px';
                 div.onclick = () => showLightbox(file.url, file.name, globalIdx);
+
+                // 使用已知宽高预计算 item 高度，消除 onload 重排
+                const hasDim = file.width && file.height;
+                const aspect = hasDim ? (file.height / file.width) : 0.75;
+                const itemHeight = Math.round(itemWidth * aspect);
+                div.style.height = itemHeight + 'px';
+                div.dataset.index = globalIdx;
+
+                // 立即定位（不需要等图片加载）
+                const minH = Math.min(...masonryColHeights);
+                const colIdx = masonryColHeights.indexOf(minH);
+                const l = colIdx * (itemWidth + masonryGap);
+                div.style.left = l + 'px';
+                div.style.top = minH + 'px';
+                masonryColHeights[colIdx] = minH + itemHeight + masonryGap;
+                grid.style.height = Math.max(...masonryColHeights) + 'px';
+
                 div.innerHTML = `
                     <img src="/api/image/proxy?url=${encodeURIComponent(file.url)}"
                          alt="${file.name}"
-                         class="w-full block"
-                         onload="positionMasonryItem(this.parentElement)"
-                         onerror="positionMasonryItem(this.parentElement); this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%2250%25%22 x=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-size=%2240%22>🖼️</text></svg>'">
+                         width="${itemWidth}"
+                         height="${itemHeight}"
+                         class="w-full h-full object-cover"
+                         onload="this.parentElement.classList.add('loaded')"
+                         onerror="this.parentElement.classList.add('loaded')">
                     <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <div class="flex items-center gap-1.5 mb-1">
                             <button class="p-1.5 bg-white/80 rounded hover:bg-white transition-colors" title="复制链接" onclick="event.stopPropagation(); copyRemoteUrl('${file.url}')">
@@ -749,6 +768,14 @@
                         <p class="text-white text-[10px] truncate">${file.name}</p>
                     </div>
                 `;
+                div.dataset.positioned = 'true';
+
+                // 如果图片已在缓存中，立即标记为 loaded
+                const img = div.querySelector('img');
+                if (img.complete) {
+                    div.classList.add('loaded');
+                }
+
                 grid.appendChild(div);
             });
 
@@ -760,23 +787,13 @@
             }
         }
 
+        // positionMasonryItem 不再需要了（已内联到 appendRemoteImages 中）
+        // 保留 stub 防止旧的 onload 引用报错
         function positionMasonryItem(item) {
-            if (item.dataset.positioned) return;
-            item.dataset.positioned = 'true';
-
-            const minHeight = Math.min(...masonryColHeights);
-            const colIndex = masonryColHeights.indexOf(minHeight);
-
-            const left = colIndex * (getMasonryItemWidth() + masonryGap);
-            item.style.left = left + 'px';
-            item.style.top = minHeight + 'px';
-
-            masonryColHeights[colIndex] = minHeight + item.offsetHeight + masonryGap;
-
-            const grid = document.getElementById('remoteImageGrid');
-            grid.style.height = Math.max(...masonryColHeights) + 'px';
-
-            requestAnimationFrame(() => item.classList.add('loaded'));
+            if (!item.dataset.positioned) {
+                item.dataset.positioned = 'true';
+                item.classList.add('loaded');
+            }
         }
 
         function setupLazyLoadObserver() {
@@ -807,14 +824,29 @@
             const itemWidth = getMasonryItemWidth();
             masonryColHeights = new Array(masonryColumns).fill(0);
 
+            const grid = document.getElementById('remoteImageGrid');
             document.querySelectorAll('.masonry-item').forEach(item => {
-                item.style.width = itemWidth + 'px';
-                item.dataset.positioned = '';
+                const idx = parseInt(item.dataset.index);
+                const file = remoteImages[idx];
                 const img = item.querySelector('img');
-                if (img && img.complete) {
-                    positionMasonryItem(item);
-                }
+                // 优先用已加载的自然宽高，其次用 API 返回的尺寸，最后 4:3 兜底
+                const natW = img && img.naturalWidth > 0 ? img.naturalWidth : (file?.width || 4);
+                const natH = img && img.naturalHeight > 0 ? img.naturalHeight : (file?.height || 3);
+                const aspect = natH / natW;
+                const height = Math.round(itemWidth * aspect);
+
+                item.style.width = itemWidth + 'px';
+                item.style.height = height + 'px';
+                if (img) { img.width = itemWidth; img.height = height; }
+
+                const minH = Math.min(...masonryColHeights);
+                const colIdx = masonryColHeights.indexOf(minH);
+                item.style.left = (colIdx * (itemWidth + masonryGap)) + 'px';
+                item.style.top = minH + 'px';
+                masonryColHeights[colIdx] = minH + height + masonryGap;
             });
+
+            grid.style.height = Math.max(...masonryColHeights) + 'px';
         }
 
         function copyRemoteUrl(url) {
@@ -847,6 +879,10 @@
                         if (img && img.src.includes(encodeURIComponent(url))) {
                             item.remove();
                         }
+                    });
+                    // 重新索引剩余元素
+                    grid.querySelectorAll('.masonry-item').forEach((item, i) => {
+                        item.dataset.index = i;
                     });
                     relayoutMasonry();
                 }

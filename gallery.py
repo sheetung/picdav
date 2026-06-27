@@ -1,15 +1,20 @@
-"""纯展示服务 - 只读图片浏览 (端口 5000，适合公网暴露)"""
+"""纯展示服务 - 只读图片浏览 (端口 5000，适合公网暴露)
+
+支持图片尺寸缓存 & masonry 布局
+"""
 
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from io import BytesIO
 
 import random
 
 import requests
 from requests.auth import HTTPBasicAuth
 from flask import Flask, request, jsonify, Response, render_template, redirect
+from PIL import Image
 
-from common import load_config
+from common import load_config, enrich_with_dimensions, load_meta_cache, save_meta_cache, make_cache_key
 
 app = Flask(__name__)
 
@@ -20,7 +25,7 @@ def index():
 
 
 def _fetch_images():
-    """从WebDAV获取图片列表，返回 [{name, proxy_url, raw_url}]"""
+    """从WebDAV获取图片列表，返回 [{name, size, width, height, proxy_url, thumb_url}]"""
     config = load_config()
     server_url = config.get("server_url", "").rstrip("/")
     username = config.get("username", "")
@@ -53,7 +58,7 @@ def _fetch_images():
     ns = {'D': 'DAV:'}
     image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'}
 
-    images = []
+    raw_images = []
     for elem in root.findall('.//D:response', ns):
         href = elem.find('.//D:href', ns)
         if href is None:
@@ -61,20 +66,32 @@ def _fetch_images():
         filename = href.text.rstrip('/').split('/')[-1]
         if Path(filename).suffix.lower() not in image_exts:
             continue
+
+        content_length = elem.find('.//D:getcontentlength', ns)
+        size = int(content_length.text) if content_length is not None else 0
+        last_modified = elem.find('.//D:getlastmodified', ns)
+        mtime = last_modified.text if last_modified is not None else ""
+
         proxy = f"/api/proxy?url={server_url}/{remote_path}/{filename}"
-        images.append({
+        thumb = f"/api/thumbnail?url={server_url}/{remote_path}/{filename}"
+        raw_images.append({
             "name": filename,
+            "size": size,
+            "modified": mtime,
             "proxy_url": proxy,
-            "thumb_url": proxy,
+            "thumb_url": thumb,
         })
 
-    images.sort(key=lambda x: x["name"], reverse=True)
+    raw_images.sort(key=lambda x: x["name"], reverse=True)
+
+    # 补上尺寸信息（缓存/探测）
+    images = enrich_with_dimensions(raw_images, server_url, remote_path, username, password)
     return images, None
 
 
 @app.route('/api/images', methods=['GET'])
 def list_images():
-    """返回图片列表，支持分页参数 offset / limit"""
+    """返回图片列表（含宽高），支持分页 offset / limit"""
     images, err = _fetch_images()
     if err:
         return jsonify({"error": err}), 400
@@ -128,6 +145,60 @@ def proxy_image():
             resp.content,
             content_type=resp.headers.get('Content-Type', 'image/jpeg'),
             headers={'Cache-Control': 'public, max-age=3600'}
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/thumbnail', methods=['GET'])
+def thumbnail_image():
+    """生成缩略图（JPEG quality 70, 最大宽度 400px）并缓存尺寸信息"""
+    try:
+        file_url = request.args.get("url")
+        if not file_url:
+            return jsonify({"error": "缺少URL"}), 400
+
+        config = load_config()
+        server_url = config.get("server_url", "").rstrip("/")
+
+        if not server_url or not file_url.startswith(server_url):
+            return jsonify({"error": "禁止访问"}), 403
+
+        username = config.get("username", "")
+        password = config.get("password", "")
+
+        resp = requests.get(
+            file_url, auth=HTTPBasicAuth(username, password),
+            timeout=30, stream=True
+        )
+        if resp.status_code != 200:
+            return jsonify({"error": "获取失败"}), 400
+
+        img = Image.open(BytesIO(resp.content))
+        orig_w, orig_h = img.size
+        filename = file_url.rstrip('/').split('/')[-1]
+
+        # 更新缓存中的尺寸（可能从流式探测升级为精确尺寸）
+        cache = load_meta_cache()
+        cache[filename] = {
+            "_key": cache.get(filename, {}).get("_key", f"{filename}||"),
+            "width": orig_w,
+            "height": orig_h,
+        }
+        save_meta_cache(cache)
+
+        buf = BytesIO()
+        img.convert('RGB').save(buf, 'JPEG', quality=70)
+        buf.seek(0)
+
+        return Response(
+            buf.getvalue(),
+            content_type='image/jpeg',
+            headers={
+                'Cache-Control': 'public, max-age=3600',
+                'X-Image-Width': str(orig_w),
+                'X-Image-Height': str(orig_h),
+            }
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500

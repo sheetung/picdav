@@ -11,15 +11,23 @@
             background: #f5f3ff;
             font-family: Inter, sans-serif;
         }
+
+        /* ── JS masonry 容器 ── */
+        #grid {
+            position: relative;
+            width: 100%;
+            min-height: 200px;
+        }
+
         .grid-item {
-            break-inside: avoid;
-            margin-bottom: 12px;
+            position: absolute;
             border-radius: 8px;
             overflow: hidden;
-            background: #fff;
+            background: #e5e7eb;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
             transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
+            will-change: transform;
         }
         .grid-item:hover {
             transform: scale(1.02);
@@ -28,9 +36,36 @@
         .grid-item img {
             display: block;
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover;
         }
-        /* lightbox */
+
+        /* ── Shimmer 占位骨架 ── */
+        .grid-item .shimmer {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                135deg,
+                #e5e7eb 0%, #f3f4f6 30%, #e5e7eb 60%, #f3f4f6 100%
+            );
+            background-size: 300% 100%;
+            animation: shimmerMove 1.8s ease-in-out infinite;
+            z-index: 1;
+        }
+        @keyframes shimmerMove {
+            0%   { background-position: 300% 0; }
+            100% { background-position: -300% 0; }
+        }
+
+        .grid-item img {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .grid-item img.loaded {
+            opacity: 1;
+        }
+
+        /* ── Lightbox ── */
         #lightbox {
             display: none;
             position: fixed;
@@ -62,6 +97,23 @@
             border: none;
         }
         #lightbox .close:hover { opacity: 1; }
+        #lightbox .caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            padding: 40px 24px 16px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 500;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        #lightbox .caption.show { opacity: 1; }
+
         .loading {
             text-align: center;
             padding: 60px 0;
@@ -82,90 +134,279 @@
 
         <!-- API 说明 -->
         <div id="apiDocs" class="hidden mb-6 bg-white/70 rounded-lg p-4 text-xs text-gray-600 border border-gray-200 space-y-2">
-            <div><span class="font-mono font-semibold text-gray-800">GET /api/images</span> — 返回所有图片列表 (JSON)</div>
+            <div><span class="font-mono font-semibold text-gray-800">GET /api/images</span> — 返回所有图片列表 (JSON，含宽高)</div>
             <div><span class="font-mono font-semibold text-gray-800">GET /api/random</span> — 重定向到随机一张图片</div>
-            <div><span class="font-mono font-semibold text-gray-800">GET /api/proxy?url=&lt;真实URL&gt;</span> — 代理获取图片</div>
+            <div><span class="font-mono font-semibold text-gray-800">GET /api/proxy?url=&lt;真实URL&gt;</span> — 代理获取原图</div>
             <div class="pt-1 text-gray-400">示例：<code class="text-gray-500">&lt;img src="/api/random"&gt;</code></div>
         </div>
 
-        <div id="grid" class="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-3"></div>
+        <div id="grid"></div>
         <div class="loading" id="loading">加载中...</div>
     </div>
 
     <div id="lightbox" onclick="closeLightbox()">
         <button class="close" onclick="closeLightbox()">&times;</button>
         <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()"/>
+        <div id="lightboxCaption" class="caption"></div>
     </div>
 
     <script>
-        const PAGE_SIZE = 30;
-        let allImages = [];
-        let loadedCount = 0;
-        let loadingMore = false;
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  Masonry Gallery — 预计算布局 + 绝对定位 + 智能预加载
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        function renderImages(images) {
-            const grid = document.getElementById('grid');
-            images.forEach(img => {
+        const GALLERY = (() => {
+            const MIN_COL_WIDTH  = 260;   // 每列最小宽度（px）
+            const GAP            = 12;     // 间距
+            const PRELOAD_FACTOR = 2.5;    // 预加载视口的倍数（向下）
+            const PAGE_SIZE      = 30;     // 每批渲染数量
+
+            // ── 状态 ──
+            const state = {
+                allImages: [],          // 全部图片元数据 [{name, width, height, thumb_url, proxy_url}]
+                positions: [],          // 计算好的位置 [{index, left, top, width, height}]
+                rendered: new Set(),    // 已创建的 DOM index
+                container: null,
+                columns: [],
+                columnWidth: 0,
+                columnCount: 0,
+                totalHeight: 0,
+                isLoading: false,
+                allLoaded: false,
+                resizeTimer: null,
+            };
+
+            // ── 工具 ──
+            function debounce(fn, ms) {
+                let timer;
+                return (...args) => {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => fn(...args), ms);
+                };
+            }
+
+            // ── 列数计算 ──
+            function calcColumns(containerWidth) {
+                const count = Math.max(2, Math.floor((containerWidth + GAP) / (MIN_COL_WIDTH + GAP)));
+                const width = (containerWidth - (count - 1) * GAP) / count;
+                return { count, width };
+            }
+
+            // ── 全量布局计算 ──
+            function computeLayout() {
+                const cw = state.container.clientWidth;
+                const { count, width } = calcColumns(cw);
+                state.columnCount = count;
+                state.columnWidth = width;
+
+                const cols = new Array(count).fill(0);
+                state.positions = state.allImages.map((img, i) => {
+                    const colIdx = cols.indexOf(Math.min(...cols));
+                    const left = colIdx * (width + GAP);
+                    const top  = cols[colIdx];
+                    const aspect = (img.height && img.width)
+                        ? (img.height / img.width)
+                        : 0.75;                              // 4:3 fallback
+                    const height = Math.round(width * aspect);
+
+                    cols[colIdx] += height + GAP;
+                    return { index: i, left, top, width, height, colIdx };
+                });
+
+                state.totalHeight = Math.max(...cols, 200);
+                state.container.style.height = state.totalHeight + 'px';
+            }
+
+            // ── 渲染单个 item（创建 DOM，shimmer 占位，img 加载后淡入） ──
+            function renderItem(index) {
+                if (state.rendered.has(index)) return;
+
+                const img = state.allImages[index];
+                const pos = state.positions[index];
+                if (!pos) return;
+
                 const div = document.createElement('div');
                 div.className = 'grid-item';
-                div.onclick = () => showLightbox(img.proxy_url);
+                div.style.cssText = `left:${pos.left}px;top:${pos.top}px;width:${pos.width}px;height:${pos.height}px`;
+
+                // Shimmer 骨架
+                const shimmer = document.createElement('div');
+                shimmer.className = 'shimmer';
+                div.appendChild(shimmer);
+
+                // img
                 const imgEl = document.createElement('img');
                 imgEl.loading = 'lazy';
                 imgEl.src = img.thumb_url;
                 imgEl.alt = img.name;
+                imgEl.width  = pos.width;
+                imgEl.height = pos.height;
+                // 图片加载完成后隐藏 shimmer + 淡入
+                imgEl.onload = () => {
+                    imgEl.classList.add('loaded');
+                    shimmer.style.display = 'none';
+                };
+                imgEl.onerror = () => {
+                    // 加载失败时也隐藏 shimmer（显示空白底色）
+                    shimmer.style.display = 'none';
+                };
                 div.appendChild(imgEl);
-                grid.appendChild(div);
-            });
-        }
 
-        async function loadMore() {
-            if (loadingMore || loadedCount >= allImages.length) return;
-            loadingMore = true;
-            document.getElementById('loading').style.display = '';
-            const nextBatch = allImages.slice(loadedCount, loadedCount + PAGE_SIZE);
-            // 用 requestAnimationFrame 分帧渲染，避免卡顿
-            await new Promise(r => requestAnimationFrame(r));
-            renderImages(nextBatch);
-            loadedCount += nextBatch.length;
-            document.getElementById('loading').style.display =
-                loadedCount >= allImages.length ? 'none' : '';
-            loadingMore = false;
-        }
+                div.onclick = () => showLightbox(img.proxy_url, img.name);
+                state.container.appendChild(div);
+                state.rendered.add(index);
+            }
 
-        async function loadImages() {
-            const grid = document.getElementById('grid');
-            const loading = document.getElementById('loading');
-            try {
-                const res = await fetch('/api/images');
-                const data = await res.json();
-                if (data.error) {
-                    loading.textContent = data.error;
+            // ── 渲染当前可视区域内的所有 item（含 preload 余量） ──
+            function renderVisible() {
+                const scrollTop = window.scrollY;
+                const vh = window.innerHeight;
+                const margin = vh * PRELOAD_FACTOR;
+                const topBound    = Math.max(0, scrollTop - margin);
+                const bottomBound = scrollTop + vh + margin;
+
+                if (state.isLoading) return;
+
+                // 收集此范围内尚未渲染的 index
+                const toRender = [];
+                for (const pos of state.positions) {
+                    if (state.rendered.has(pos.index)) continue;
+                    if (pos.top + pos.height < topBound || pos.top > bottomBound) continue;
+                    toRender.push(pos.index);
+                }
+
+                if (toRender.length === 0) {
+                    // 检查是否全部 render 完毕
+                    if (state.rendered.size >= state.allImages.length) {
+                        document.getElementById('loading').style.display = 'none';
+                        state.allLoaded = true;
+                    }
                     return;
                 }
-                allImages = data.images || [];
-                document.getElementById('imageCount').textContent =
-                    allImages.length > 0 ? `共 ${allImages.length} 张图片` : '暂无图片';
 
-                await loadMore();
-
-                // 滚动到底部自动加载
-                const sentinel = document.createElement('div');
-                sentinel.id = 'sentinel';
-                grid.parentNode.appendChild(sentinel);
-                const observer = new IntersectionObserver(entries => {
-                    if (entries[0].isIntersecting) loadMore();
-                }, { rootMargin: '300px' });
-                observer.observe(sentinel);
-            } catch (e) {
-                loading.textContent = '加载失败';
+                // 分批渲染（避免卡顿）
+                state.isLoading = true;
+                let idx = 0;
+                function batch() {
+                    const end = Math.min(idx + PAGE_SIZE, toRender.length);
+                    for (; idx < end; idx++) {
+                        renderItem(toRender[idx]);
+                    }
+                    if (idx < toRender.length) {
+                        requestAnimationFrame(batch);
+                    } else {
+                        state.isLoading = false;
+                        // 继续检查是否全部完成
+                        if (state.rendered.size >= state.allImages.length) {
+                            document.getElementById('loading').style.display = 'none';
+                            state.allLoaded = true;
+                        }
+                    }
+                }
+                requestAnimationFrame(batch);
             }
-        }
 
-        function showLightbox(url) {
+            // ── 窗口缩放 → 重新布局（保留已渲染 item，重算位置后移动） ──
+            function recalculate() {
+                const oldColCount = state.columnCount;
+                const oldColWidth = state.columnWidth;
+                computeLayout();
+
+                // 列数没变 → 只需要调整每个 grid-item 的位置
+                // 列数变了 → 全量重建（更简单可靠）
+                if (state.columnCount === oldColCount && Math.abs(state.columnWidth - oldColWidth) < 1) {
+                    // 只移动已有元素
+                    state.positions.forEach((pos) => {
+                        const child = state.container.children[pos.index];
+                        if (child) {
+                            child.style.left   = pos.left + 'px';
+                            child.style.top    = pos.top + 'px';
+                            child.style.width  = pos.width + 'px';
+                            child.style.height = pos.height + 'px';
+                        }
+                    });
+                } else {
+                    // 列数变了 → 清空重绘
+                    state.container.innerHTML = '';
+                    state.rendered.clear();
+                    renderVisible();
+                }
+            }
+            const debouncedRecalc = debounce(recalculate, 250);
+
+            // ── 公开 API ──
+            async function init() {
+                state.container = document.getElementById('grid');
+                const loadingEl = document.getElementById('loading');
+
+                try {
+                    const res = await fetch('/api/images');
+                    const data = await res.json();
+                    if (data.error) {
+                        loadingEl.textContent = data.error;
+                        return;
+                    }
+
+                    state.allImages = data.images || [];
+                    document.getElementById('imageCount').textContent =
+                        state.allImages.length > 0
+                            ? `共 ${state.allImages.length} 张图片`
+                            : '暂无图片';
+
+                    if (state.allImages.length === 0) {
+                        loadingEl.textContent = '暂无图片';
+                        return;
+                    }
+
+                    // 1. 计算全量布局（vs 渲染分离，0 -> 确定位置 -> 渲染可见）
+                    computeLayout();
+
+                    // 2. 渲染初始可见区域
+                    renderVisible();
+
+                    // 3. 监听滚动（节流 + rAF）
+                    let ticking = false;
+                    window.addEventListener('scroll', () => {
+                        if (!ticking) {
+                            requestAnimationFrame(() => {
+                                renderVisible();
+                                ticking = false;
+                            });
+                            ticking = true;
+                        }
+                    }, { passive: true });
+
+                    // 4. 监听窗口 resize（防抖后重新布局）
+                    window.addEventListener('resize', debouncedRecalc, { passive: true });
+
+                } catch (e) {
+                    loadingEl.textContent = '加载失败';
+                }
+            }
+
+            return { init };
+        })();
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  Lightbox（原样保留）
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function showLightbox(url, name) {
             document.getElementById('lightboxImg').src = url;
+            document.getElementById('lightboxCaption').textContent = name || '';
+            document.getElementById('lightboxCaption').classList.remove('show');
             document.getElementById('lightbox').classList.add('open');
             document.body.style.overflow = 'hidden';
         }
+
+        document.addEventListener('mousemove', e => {
+            const lb = document.getElementById('lightbox');
+            if (!lb.classList.contains('open')) return;
+            const rect = lb.getBoundingClientRect();
+            const distFromBottom = rect.bottom - e.clientY;
+            const caption = document.getElementById('lightboxCaption');
+            caption.classList.toggle('show', distFromBottom < 120);
+        });
 
         function closeLightbox() {
             document.getElementById('lightbox').classList.remove('open');
@@ -185,7 +426,8 @@
             if (e.key === 'Escape') closeLightbox();
         });
 
-        loadImages();
+        // ── 启动 ──
+        GALLERY.init();
     </script>
 </body>
 </html>

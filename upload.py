@@ -8,7 +8,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 from flask import Flask, request, jsonify, Response, render_template
 
-from common import load_config, save_config, generate_filename, upload_to_webdav
+from common import load_config, save_config, generate_filename, upload_to_webdav, enrich_with_dimensions
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
@@ -134,6 +134,10 @@ def list_files():
             files.append({"name": filename, "url": file_url, "size": size, "modified": mtime})
 
         files.sort(key=lambda x: x.get("modified", ""), reverse=True)
+
+        # 补充图片宽高（缓存/探测）
+        enrich_with_dimensions(files, server_url, remote_path, username, password)
+
         return jsonify({"files": files})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
