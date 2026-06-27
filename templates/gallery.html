@@ -139,6 +139,15 @@
             background-color: var(--color-api-bg);
             border-color: var(--color-api-border);
         }
+        /* ── 主题切换过渡动画 ── */
+        ::view-transition-old(root) { animation: none; }
+        ::view-transition-new(root) {
+            animation: reveal .5s cubic-bezier(.2,.9,.3,1);
+        }
+        @keyframes reveal {
+            from { clip-path: circle(0% at var(--click-x,50%) var(--click-y,50%)); }
+            to   { clip-path: circle(100%); }
+        }
     </style>
     <script>
         (function() {
@@ -159,7 +168,7 @@
                     <span class="text-base">&#x3f;</span>
                     <span id="apiDocsLabel">API</span>
                 </button>
-                <button onclick="cycleTheme()" class="p-2 rounded-lg bg-white/70 dark:bg-[rgba(30,32,55,0.6)] hover:bg-gray-100 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
+                <button onclick="cycleTheme(event)" class="p-2 rounded-lg bg-white/70 dark:bg-[rgba(30,32,55,0.6)] hover:bg-gray-100 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
                     <span class="material-symbols-outlined text-[20px] text-gray-600 dark:text-[#a0a3b8]" id="themeIcon">light_mode</span>
                 </button>
             </div>
@@ -484,11 +493,20 @@
             updateThemeUI();
         }
 
-        function cycleTheme() {
+        function cycleTheme(e) {
+            if (e) {
+                document.documentElement.style.setProperty('--click-x', e.clientX + 'px');
+                document.documentElement.style.setProperty('--click-y', e.clientY + 'px');
+            }
             const idx = THEMES.indexOf(currentTheme);
             currentTheme = THEMES[(idx + 1) % THEMES.length];
             localStorage.setItem('preferred-theme', currentTheme);
-            applyTheme(currentTheme);
+            const fn = () => applyTheme(currentTheme);
+            if (document.startViewTransition) {
+                document.startViewTransition(fn);
+            } else {
+                fn();
+            }
         }
 
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {

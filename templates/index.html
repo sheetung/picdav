@@ -132,6 +132,15 @@
         html.dark .text-error { color: #ff6b6b !important; }
         html.dark .bg-primary { background-color: #8ab4ff !important; }
         html.dark .text-on-primary { color: #12122a !important; }
+        /* ── 主题切换过渡动画 ── */
+        ::view-transition-old(root) { animation: none; }
+        ::view-transition-new(root) {
+            animation: reveal .5s cubic-bezier(.2,.9,.3,1);
+        }
+        @keyframes reveal {
+            from { clip-path: circle(0% at var(--click-x,50%) var(--click-y,50%)); }
+            to   { clip-path: circle(100%); }
+        }
     </style>
     <script>
         (function() {
@@ -156,7 +165,7 @@
                     <p class="text-sm text-on-surface-variant mt-1">上传图片到 WebDAV 服务器</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button onclick="cycleTheme()" class="p-2 rounded-lg bg-white/40 dark:bg-[rgba(30,32,55,0.6)] hover:bg-white/60 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
+                    <button onclick="cycleTheme(event)" class="p-2 rounded-lg bg-white/40 dark:bg-[rgba(30,32,55,0.6)] hover:bg-white/60 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
                         <span class="material-symbols-outlined text-[20px] text-on-surface-variant dark:text-[#a0a3b8]" id="themeIcon">light_mode</span>
                     </button>
                 </div>
@@ -963,11 +972,21 @@
             updateThemeUI();
         }
 
-        function cycleTheme() {
+        function cycleTheme(e) {
+            // 记录点击位置，用于扩散动画
+            if (e) {
+                document.documentElement.style.setProperty('--click-x', e.clientX + 'px');
+                document.documentElement.style.setProperty('--click-y', e.clientY + 'px');
+            }
             const idx = THEMES.indexOf(currentTheme);
             currentTheme = THEMES[(idx + 1) % THEMES.length];
             localStorage.setItem('preferred-theme', currentTheme);
-            applyTheme(currentTheme);
+            const fn = () => applyTheme(currentTheme);
+            if (document.startViewTransition) {
+                document.startViewTransition(fn);
+            } else {
+                fn();
+            }
         }
 
         // 监听系统主题变化
