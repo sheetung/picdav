@@ -6,6 +6,8 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from io import BytesIO
+from urllib.parse import urlparse, unquote
+import posixpath
 
 import random
 
@@ -17,6 +19,49 @@ from PIL import Image
 from common import load_config, enrich_with_dimensions, load_meta_cache, save_meta_cache, make_cache_key
 
 app = Flask(__name__)
+
+
+# ── URL 安全校验 ──
+
+def _normalize_url_path(path):
+    """URL 解码后规范化路径，防止 ../../ 穿越"""
+    if not path or path == '/':
+        return '/'
+    return '/' + posixpath.normpath(unquote(path)).lstrip('/')
+
+
+def _url_is_safe(file_url, allowed_prefix):
+    """严格校验 file_url 是否在 allowed_prefix 允许范围内
+
+    绕过方式举例（均已被拦截）:
+      startswith: http://a:5005.evil.com/    ← 子域名
+      startswith: http://a:5005@evil.com/    ← 凭证混淆
+      startswith: http://a:5005/../../etc/   ← 路径穿越
+    """
+    try:
+        f = urlparse(file_url)
+        a = urlparse(allowed_prefix)
+
+        # 1) 协议必须一致
+        if f.scheme != a.scheme:
+            return False
+        # 2) hostname 完全匹配（子域名 / @user:pass 都会改 hostname）
+        if f.hostname != a.hostname:
+            return False
+        # 3) 端口一致（urlparse 对默认端口返回 None）
+        fp = f.port or (443 if f.scheme == 'https' else 80)
+        ap = a.port or (443 if a.scheme == 'https' else 80)
+        if fp != ap:
+            return False
+        # 4) 路径必须在允许前缀下（含 ../../ 防护）
+        fp_norm = _normalize_url_path(f.path)
+        ap_norm = _normalize_url_path(a.path)
+        if not fp_norm.startswith(ap_norm.rstrip('/') + '/'):
+            if fp_norm != ap_norm:
+                return False
+        return True
+    except Exception:
+        return False
 
 
 @app.route('/')
@@ -126,9 +171,11 @@ def proxy_image():
 
         config = load_config()
         server_url = config.get("server_url", "").rstrip("/")
+        remote_path = config.get("remote_path", "/Images/").strip("/")
 
-        # 安全校验：只代理配置的WebDAV服务器上的图片
-        if not server_url or not file_url.startswith(server_url):
+        # 安全校验：只代理已配置 WebDAV 服务器指定目录下的图片
+        allowed_prefix = f"{server_url}/{remote_path}/"
+        if not server_url or not _url_is_safe(file_url, allowed_prefix):
             return jsonify({"error": "禁止访问"}), 403
 
         username = config.get("username", "")
@@ -160,8 +207,9 @@ def thumbnail_image():
 
         config = load_config()
         server_url = config.get("server_url", "").rstrip("/")
+        remote_path = config.get("remote_path", "/Images/").strip("/")
 
-        if not server_url or not file_url.startswith(server_url):
+        if not server_url or not _url_is_safe(file_url, f"{server_url}/{remote_path}/"):
             return jsonify({"error": "禁止访问"}), 403
 
         username = config.get("username", "")
