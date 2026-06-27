@@ -69,8 +69,23 @@ def index():
     return render_template('gallery.html')
 
 
+def _is_safe_filename(filename):
+    """校验文件名不含路径穿越字符"""
+    return not ('/' in filename or '\\' in filename or '..' in filename)
+
+
+def _build_webdav_url(config, filename):
+    """根据配置和文件名拼出完整的 WebDAV 下载 URL（仅内部使用，不暴露给前端）"""
+    server_url = config.get("server_url", "").rstrip("/")
+    remote_path = config.get("remote_path", "/Images/").strip("/")
+    return f"{server_url}/{remote_path}/{filename}"
+
+
 def _fetch_images():
-    """从WebDAV获取图片列表，返回 [{name, size, width, height, proxy_url, thumb_url}]"""
+    """从WebDAV获取图片列表，返回 [{name, size, width, height, proxy_url, thumb_url}]
+
+    proxy_url / thumb_url 使用纯文件名路径（不暴露内部 WebDAV 地址）
+    """
     config = load_config()
     server_url = config.get("server_url", "").rstrip("/")
     username = config.get("username", "")
@@ -117,8 +132,9 @@ def _fetch_images():
         last_modified = elem.find('.//D:getlastmodified', ns)
         mtime = last_modified.text if last_modified is not None else ""
 
-        proxy = f"/api/proxy?url={server_url}/{remote_path}/{filename}"
-        thumb = f"/api/thumbnail?url={server_url}/{remote_path}/{filename}"
+        # 使用纯文件名路径，不暴露内部 WebDAV 地址
+        proxy = f"/api/proxy/{filename}"
+        thumb = f"/api/thumbnail/{filename}"
         raw_images.append({
             "name": filename,
             "size": size,
@@ -161,9 +177,22 @@ def random_image():
     return redirect(img["proxy_url"])
 
 
+@app.route('/api/proxy/<filename>')
+def proxy_image_path(filename):
+    """路径式代理：/api/proxy/20260627-xxx.png → 从配置的 WebDAV 下载（不暴露源站地址）"""
+    if not _is_safe_filename(filename):
+        return jsonify({"error": "禁止访问"}), 403
+    try:
+        config = load_config()
+        file_url = _build_webdav_url(config, filename)
+        return _proxy_response(file_url)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/proxy', methods=['GET'])
 def proxy_image():
-    """代理图片，只允许请求已配置的WebDAV服务器上的图片"""
+    """URL 参数式代理：/api/proxy?url=...    保留兼容，前端不再使用"""
     try:
         file_url = request.args.get("url")
         if not file_url:
@@ -173,33 +202,51 @@ def proxy_image():
         server_url = config.get("server_url", "").rstrip("/")
         remote_path = config.get("remote_path", "/Images/").strip("/")
 
-        # 安全校验：只代理已配置 WebDAV 服务器指定目录下的图片
         allowed_prefix = f"{server_url}/{remote_path}/"
         if not server_url or not _url_is_safe(file_url, allowed_prefix):
             return jsonify({"error": "禁止访问"}), 403
 
-        username = config.get("username", "")
-        password = config.get("password", "")
+        return _proxy_response(file_url)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-        resp = requests.get(
-            file_url, auth=HTTPBasicAuth(username, password),
-            timeout=30, stream=True
-        )
-        if resp.status_code != 200:
-            return jsonify({"error": "获取失败"}), 400
 
-        return Response(
-            resp.content,
-            content_type=resp.headers.get('Content-Type', 'image/jpeg'),
-            headers={'Cache-Control': 'public, max-age=3600'}
-        )
+def _proxy_response(file_url):
+    """下载并返回图片内容"""
+    config = load_config()
+    username = config.get("username", "")
+    password = config.get("password", "")
+
+    resp = requests.get(
+        file_url, auth=HTTPBasicAuth(username, password),
+        timeout=30, stream=True
+    )
+    if resp.status_code != 200:
+        return jsonify({"error": "获取失败"}), 400
+
+    return Response(
+        resp.content,
+        content_type=resp.headers.get('Content-Type', 'image/jpeg'),
+        headers={'Cache-Control': 'public, max-age=3600'}
+    )
+
+
+@app.route('/api/thumbnail/<filename>')
+def thumbnail_image_path(filename):
+    """路径式缩略图：/api/thumbnail/20260627-xxx.png   不暴露源站地址"""
+    if not _is_safe_filename(filename):
+        return jsonify({"error": "禁止访问"}), 403
+    try:
+        config = load_config()
+        file_url = _build_webdav_url(config, filename)
+        return _thumbnail_response(file_url, filename)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/thumbnail', methods=['GET'])
 def thumbnail_image():
-    """生成缩略图（JPEG quality 70, 最大宽度 400px）并缓存尺寸信息"""
+    """URL 参数式缩略图：/api/thumbnail?url=...  保留兼容，前端不再使用"""
     try:
         file_url = request.args.get("url")
         if not file_url:
@@ -212,44 +259,50 @@ def thumbnail_image():
         if not server_url or not _url_is_safe(file_url, f"{server_url}/{remote_path}/"):
             return jsonify({"error": "禁止访问"}), 403
 
-        username = config.get("username", "")
-        password = config.get("password", "")
-
-        resp = requests.get(
-            file_url, auth=HTTPBasicAuth(username, password),
-            timeout=30, stream=True
-        )
-        if resp.status_code != 200:
-            return jsonify({"error": "获取失败"}), 400
-
-        img = Image.open(BytesIO(resp.content))
-        orig_w, orig_h = img.size
         filename = file_url.rstrip('/').split('/')[-1]
-
-        # 更新缓存中的尺寸（可能从流式探测升级为精确尺寸）
-        cache = load_meta_cache()
-        cache[filename] = {
-            "_key": cache.get(filename, {}).get("_key", f"{filename}||"),
-            "width": orig_w,
-            "height": orig_h,
-        }
-        save_meta_cache(cache)
-
-        buf = BytesIO()
-        img.convert('RGB').save(buf, 'JPEG', quality=70)
-        buf.seek(0)
-
-        return Response(
-            buf.getvalue(),
-            content_type='image/jpeg',
-            headers={
-                'Cache-Control': 'public, max-age=3600',
-                'X-Image-Width': str(orig_w),
-                'X-Image-Height': str(orig_h),
-            }
-        )
+        return _thumbnail_response(file_url, filename)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _thumbnail_response(file_url, filename):
+    """生成缩略图并缓存尺寸信息"""
+    config = load_config()
+    username = config.get("username", "")
+    password = config.get("password", "")
+
+    resp = requests.get(
+        file_url, auth=HTTPBasicAuth(username, password),
+        timeout=30, stream=True
+    )
+    if resp.status_code != 200:
+        return jsonify({"error": "获取失败"}), 400
+
+    img = Image.open(BytesIO(resp.content))
+    orig_w, orig_h = img.size
+
+    # 更新缓存中的尺寸
+    cache = load_meta_cache()
+    cache[filename] = {
+        "_key": cache.get(filename, {}).get("_key", f"{filename}||"),
+        "width": orig_w,
+        "height": orig_h,
+    }
+    save_meta_cache(cache)
+
+    buf = BytesIO()
+    img.convert('RGB').save(buf, 'JPEG', quality=70)
+    buf.seek(0)
+
+    return Response(
+        buf.getvalue(),
+        content_type='image/jpeg',
+        headers={
+            'Cache-Control': 'public, max-age=3600',
+            'X-Image-Width': str(orig_w),
+            'X-Image-Height': str(orig_h),
+        }
+    )
 
 
 if __name__ == '__main__':
