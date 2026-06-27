@@ -69,15 +69,29 @@
             display: inline-block;
             line-height: 1;
         }
+        :root {
+            --color-on-surface: #191b23;
+            --color-on-surface-variant: #434655;
+            --color-glass-bg: rgba(255, 255, 255, 0.65);
+            --color-glass-border: rgba(255, 255, 255, 0.3);
+            --color-body-bg: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 50%, #faf5ff 100%);
+        }
+        html.dark {
+            --color-on-surface: #e8e8f0;
+            --color-on-surface-variant: #a0a3b8;
+            --color-glass-bg: rgba(22, 24, 45, 0.8);
+            --color-glass-border: rgba(255, 255, 255, 0.08);
+            --color-body-bg: linear-gradient(135deg, #0d0f1c 0%, #12122a 50%, #16162a 100%);
+        }
         body {
-            background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 50%, #faf5ff 100%);
-            color: #191b23;
+            background: var(--color-body-bg);
+            color: var(--color-on-surface);
         }
         .glass-panel {
-            background-color: rgba(255, 255, 255, 0.65);
+            background-color: var(--color-glass-bg);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid var(--color-glass-border);
         }
         .upload-dashed {
             background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='8' ry='8' stroke='%230053DB' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
@@ -86,7 +100,29 @@
             background-color: rgba(37, 99, 235, 0.1);
             border-color: #2563eb;
         }
+        /* ── Dark mode 覆盖 ── */
+        html.dark .upload-dashed {
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='8' ry='8' stroke='%238ab4ff' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+        }
+        html.dark .upload-area.dragover {
+            background-color: rgba(138, 180, 255, 0.15);
+        }
+        /* ── Tailwind 颜色类暗色覆盖 ── */
+        html.dark .text-on-surface { color: #e8e8f0 !important; }
+        html.dark .text-on-surface-variant { color: #a0a3b8 !important; }
+        html.dark .text-primary { color: #8ab4ff !important; }
+        html.dark .text-error { color: #ff6b6b !important; }
+        html.dark .bg-primary { background-color: #8ab4ff !important; }
+        html.dark .text-on-primary { color: #12122a !important; }
     </style>
+    <script>
+        (function() {
+            var t = localStorage.getItem('preferred-theme') || 'system';
+            if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
     <script defer src="https://your-umami.example.com/script.js" data-website-id="your-website-id"></script>
 </head>
 <body class="font-body text-sm">
@@ -100,6 +136,11 @@
                         图片上传
                     </h1>
                     <p class="text-sm text-on-surface-variant mt-1">上传图片到 WebDAV 服务器</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="cycleTheme()" class="p-2 rounded-lg bg-white/40 dark:bg-[rgba(30,32,55,0.6)] hover:bg-white/60 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
+                        <span class="material-symbols-outlined text-[20px] text-on-surface-variant dark:text-[#a0a3b8]" id="themeIcon">light_mode</span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -216,6 +257,7 @@
             loadConfig();
             setupDragDrop();
             setupPaste();
+            updateThemeUI();
         };
 
         // ==================== 配置管理 ====================
@@ -466,6 +508,43 @@
                 }
             });
         }
+
+        // ==================== 主题切换 ====================
+
+        const THEMES = ['light', 'dark', 'system'];
+        const THEME_ICONS = { light: 'light_mode', dark: 'dark_mode', system: 'settings_brightness' };
+        const THEME_LABELS = { light: '浅色', dark: '深色', system: '跟随系统' };
+        let currentTheme = localStorage.getItem('preferred-theme') || 'system';
+
+        function updateThemeUI() {
+            const icon = document.getElementById('themeIcon');
+            if (icon) icon.textContent = THEME_ICONS[currentTheme] || 'light_mode';
+            const btn = document.getElementById('themeBtn');
+            if (btn) btn.title = '切换主题（当前：' + (THEME_LABELS[currentTheme] || '浅色') + '）';
+        }
+
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                html.classList.add('dark');
+            } else {
+                html.classList.remove('dark');
+            }
+            updateThemeUI();
+        }
+
+        function cycleTheme() {
+            const idx = THEMES.indexOf(currentTheme);
+            currentTheme = THEMES[(idx + 1) % THEMES.length];
+            localStorage.setItem('preferred-theme', currentTheme);
+            applyTheme(currentTheme);
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+            if (currentTheme === 'system') applyTheme('system');
+        });
+
+        applyTheme(currentTheme);
     </script>
 </body>
 </html>

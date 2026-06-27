@@ -6,10 +6,14 @@
     <title>图片库</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <style>
+        :root { --color-body: #f5f3ff; --color-card-bg: #e5e7eb; --color-text: #1f2937; --color-text-muted: #6b7280; --color-shimmer: #e5e7eb; --color-api-bg: rgba(255,255,255,0.7); --color-api-border: #e5e7eb; }
+        html.dark { --color-body: #0d0f1c; --color-card-bg: #1e2037; --color-text: #e8e8f0; --color-text-muted: #a0a3b8; --color-shimmer: #2a2d48; --color-api-bg: rgba(30,32,55,0.8); --color-api-border: rgba(255,255,255,0.08); }
         body {
-            background: #f5f3ff;
+            background: var(--color-body);
             font-family: Inter, sans-serif;
+            color: var(--color-text);
         }
 
         /* ── JS masonry 容器 ── */
@@ -23,7 +27,7 @@
             position: absolute;
             border-radius: 8px;
             overflow: hidden;
-            background: #e5e7eb;
+            background: var(--color-card-bg);
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
             transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
@@ -46,7 +50,7 @@
             inset: 0;
             background: linear-gradient(
                 135deg,
-                #e5e7eb 0%, #f3f4f6 30%, #e5e7eb 60%, #f3f4f6 100%
+                var(--color-shimmer) 0%, rgba(243,244,246,0.3) 30%, var(--color-shimmer) 60%, rgba(243,244,246,0.3) 100%
             );
             background-size: 300% 100%;
             animation: shimmerMove 1.8s ease-in-out infinite;
@@ -117,28 +121,57 @@
         .loading {
             text-align: center;
             padding: 60px 0;
-            color: #6b7280;
+            color: var(--color-text-muted);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        /* ── Dark mode ── */
+        html.dark .grid-item {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        html.dark .grid-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        html.dark #apiDocs {
+            background-color: var(--color-api-bg);
+            border-color: var(--color-api-border);
         }
     </style>
+    <script>
+        (function() {
+            var t = localStorage.getItem('preferred-theme') || 'system';
+            if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
     <script defer src="https://your-umami.example.com/script.js" data-website-id="your-website-id"></script>
 </head>
 <body class="p-6">
     <div class="max-w-7xl mx-auto">
         <div class="flex items-center justify-between mb-2">
-            <h1 class="text-2xl font-bold text-gray-800">图片库</h1>
-            <button onclick="toggleApiDocs()" class="text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1">
-                <span class="text-base">&#x3f;</span>
-                <span id="apiDocsLabel">API</span>
-            </button>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-[#e8e8f0]">图片库</h1>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleApiDocs()" class="text-xs text-gray-400 hover:text-gray-600 dark:text-[#a0a3b8] dark:hover:text-[#c0c3d8] transition-colors flex items-center gap-1">
+                    <span class="text-base">&#x3f;</span>
+                    <span id="apiDocsLabel">API</span>
+                </button>
+                <button onclick="cycleTheme()" class="p-2 rounded-lg bg-white/70 dark:bg-[rgba(30,32,55,0.6)] hover:bg-gray-100 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
+                    <span class="material-symbols-outlined text-[20px] text-gray-600 dark:text-[#a0a3b8]" id="themeIcon">light_mode</span>
+                </button>
+            </div>
         </div>
-        <p class="text-sm text-gray-500 mb-4" id="imageCount">加载中...</p>
+        <p class="text-sm text-gray-500 dark:text-[#a0a3b8] mb-4" id="imageCount">加载中...</p>
 
         <!-- API 说明 -->
-        <div id="apiDocs" class="hidden mb-6 bg-white/70 rounded-lg p-4 text-xs text-gray-600 border border-gray-200 space-y-2">
-            <div><span class="font-mono font-semibold text-gray-800">GET /api/images</span> — 返回所有图片列表 (JSON，含宽高)</div>
-            <div><span class="font-mono font-semibold text-gray-800">GET /api/random</span> — 重定向到随机一张图片</div>
-            <div><span class="font-mono font-semibold text-gray-800">GET /api/proxy?url=&lt;真实URL&gt;</span> — 代理获取原图</div>
-            <div class="pt-1 text-gray-400">示例：<code class="text-gray-500">&lt;img src="/api/random"&gt;</code></div>
+        <div id="apiDocs" class="hidden mb-6 bg-white/70 dark:bg-[rgba(30,32,55,0.8)] rounded-lg p-4 text-xs text-gray-600 dark:text-[#a0a3b8] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] space-y-2">
+            <div><span class="font-mono font-semibold text-gray-800 dark:text-[#e8e8f0]">GET /api/images</span> — 返回所有图片列表 (JSON，含宽高)</div>
+            <div><span class="font-mono font-semibold text-gray-800 dark:text-[#e8e8f0]">GET /api/random</span> — 重定向到随机一张图片</div>
+            <div><span class="font-mono font-semibold text-gray-800 dark:text-[#e8e8f0]">GET /api/proxy?url=&lt;真实URL&gt;</span> — 代理获取原图</div>
+            <div class="pt-1 text-gray-400 dark:text-[#737686]">示例：<code class="text-gray-500 dark:text-[#8b8ea0]">&lt;img src="/api/random"&gt;</code></div>
         </div>
 
         <div id="grid"></div>
@@ -426,6 +459,43 @@
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') closeLightbox();
         });
+
+        // ==================== 主题切换 ====================
+
+        const THEMES = ['light', 'dark', 'system'];
+        const THEME_ICONS = { light: 'light_mode', dark: 'dark_mode', system: 'settings_brightness' };
+        const THEME_LABELS = { light: '浅色', dark: '深色', system: '跟随系统' };
+        let currentTheme = localStorage.getItem('preferred-theme') || 'system';
+
+        function updateThemeUI() {
+            const icon = document.getElementById('themeIcon');
+            if (icon) icon.textContent = THEME_ICONS[currentTheme] || 'light_mode';
+            const btn = document.getElementById('themeBtn');
+            if (btn) btn.title = '切换主题（当前：' + (THEME_LABELS[currentTheme] || '浅色') + '）';
+        }
+
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                html.classList.add('dark');
+            } else {
+                html.classList.remove('dark');
+            }
+            updateThemeUI();
+        }
+
+        function cycleTheme() {
+            const idx = THEMES.indexOf(currentTheme);
+            currentTheme = THEMES[(idx + 1) % THEMES.length];
+            localStorage.setItem('preferred-theme', currentTheme);
+            applyTheme(currentTheme);
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+            if (currentTheme === 'system') applyTheme('system');
+        });
+
+        applyTheme(currentTheme);
 
         // ── 启动 ──
         GALLERY.init();
