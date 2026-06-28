@@ -1,5 +1,5 @@
 [project]
-name = "image-uploader-yun"
+name = "picdav"
 version = "1.0.0"
 description = "基于 WebDAV 的图片上传与管理工具"
 requires-python = ">=3.10"
