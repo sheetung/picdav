@@ -10,7 +10,12 @@ from flask import Flask, request, jsonify, Response, render_template
 
 from common import load_config, save_config, generate_filename, upload_to_webdav, enrich_with_dimensions
 
+from music import create_music_blueprint
+from protect import setup_protection
+
 app = Flask(__name__)
+setup_protection(app)
+app.register_blueprint(create_music_blueprint())
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 

@@ -14,7 +14,12 @@ from requests.auth import HTTPBasicAuth
 from cryptography.fernet import Fernet
 import io
 
+from music import create_music_blueprint
+from protect import setup_protection
+
 app = Flask(__name__)
+setup_protection(app)
+app.register_blueprint(create_music_blueprint())
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 CONFIG_FILE = Path(__file__).parent / "config" / "image_uploader.json"

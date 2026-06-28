@@ -22,6 +22,7 @@ Thumbs.db
 # Config with secrets
 config/*.json
 config/.encryption_key
+config/.api_token
 
 # Environment
 .env

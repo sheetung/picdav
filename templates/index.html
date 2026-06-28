@@ -135,7 +135,7 @@
         /* ── 主题切换过渡动画 ── */
         ::view-transition-old(root) { animation: none; }
         ::view-transition-new(root) {
-            animation: reveal .5s cubic-bezier(.2,.9,.3,1);
+            animation: reveal .8s cubic-bezier(.2,.9,.3,1);
         }
         @keyframes reveal {
             from { clip-path: circle(0% at var(--click-x,50%) var(--click-y,50%)); }
@@ -149,6 +149,7 @@
                 document.documentElement.classList.add('dark');
             }
         })();
+        window.API_TOKEN = "{{ api_token }}";
     </script>
     <script defer src="https://your-umami.example.com/script.js" data-website-id="your-website-id"></script>
 </head>
@@ -996,5 +997,7 @@
 
         applyTheme(currentTheme);
     </script>
+
+    {% include 'music_player.html' %}
 </body>
 </html>

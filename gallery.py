@@ -18,7 +18,12 @@ from PIL import Image
 
 from common import load_config, enrich_with_dimensions, load_meta_cache, save_meta_cache, make_cache_key
 
+from music import create_music_blueprint
+from protect import setup_protection
+
 app = Flask(__name__)
+setup_protection(app)
+app.register_blueprint(create_music_blueprint())
 
 
 # ── URL 安全校验 ──
