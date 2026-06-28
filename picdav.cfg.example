@@ -1,0 +1,11 @@
+; picdav 应用配置
+; 修改后重启服务生效
+
+[music]
+; 首次打开时自动加载的网易云歌单 ID
+default_playlist_id = 5104642557
+
+[umami]
+; Umami 网站统计（留空禁用）
+; script_url = https://your-umami.example.com/script.js
+; website_id = your-website-id

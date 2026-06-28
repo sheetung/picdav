@@ -24,6 +24,9 @@ config/*.json
 config/.encryption_key
 config/.api_token
 
+# Local app config (copy from picdav.cfg.example)
+picdav.cfg
+
 # Environment
 .env
 .env.local

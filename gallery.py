@@ -16,13 +16,14 @@ from requests.auth import HTTPBasicAuth
 from flask import Flask, request, jsonify, Response, render_template, redirect
 from PIL import Image
 
-from common import load_config, enrich_with_dimensions, load_meta_cache, save_meta_cache, make_cache_key
+from common import load_config, enrich_with_dimensions, load_meta_cache, save_meta_cache, make_cache_key, register_app_config
 
 from music import create_music_blueprint
 from protect import setup_protection
 
 app = Flask(__name__)
 setup_protection(app)
+register_app_config(app)
 app.register_blueprint(create_music_blueprint())
 
 

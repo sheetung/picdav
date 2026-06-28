@@ -16,9 +16,11 @@ import io
 
 from music import create_music_blueprint
 from protect import setup_protection
+from common import register_app_config
 
 app = Flask(__name__)
 setup_protection(app)
+register_app_config(app)
 app.register_blueprint(create_music_blueprint())
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 

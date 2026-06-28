@@ -34,19 +34,23 @@
 
 ## 快速开始
 
-### 使用 uv（推荐）
-
 ```bash
-# 创建虚拟环境并安装依赖
+# 1. 初始化应用配置（从示例复制，按需修改）
+cp picdav.cfg.example picdav.cfg
+
+# 2. 创建虚拟环境并安装依赖
 uv sync
 
-# 终端 1：展示页 (http://localhost:5000)
+# 3. 终端 1：展示页 (http://localhost:5000)
 uv run python gallery.py
 
-# 终端 2：管理端 (http://localhost:5001)
+# 4. 终端 2：管理端 (http://localhost:5001)
 uv run python upload.py
+```
 
-# 或者使用独立版 (http://localhost:5000)
+或者使用独立版（二合一，端口 5000）：
+
+```bash
 uv run python app.py
 ```
 

@@ -151,7 +151,9 @@
         })();
         window.API_TOKEN = "{{ api_token }}";
     </script>
-    <script defer src="https://your-umami.example.com/script.js" data-website-id="your-website-id"></script>
+    {% if app_config.umami.script_url and app_config.umami.website_id %}
+    <script defer src="{{ app_config.umami.script_url }}" data-website-id="{{ app_config.umami.website_id }}"></script>
+    {% endif %}
 </head>
 <body class="font-body text-sm">
     <div class="min-h-screen p-6">

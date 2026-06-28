@@ -476,7 +476,7 @@ html.dark .aplayer .aplayer-lrc p {
 
     // ── 本地存储键 ──
     var STORAGE_KEY = 'music-playlist-id';
-    var DEFAULT_PLAYLIST = '5104642557';
+    var DEFAULT_PLAYLIST = '{{ app_config.music.default_playlist_id | default("5104642557") }}';
 
     // ── DOM refs ──
     var $ = function(id) { return document.getElementById(id); };
