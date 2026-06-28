@@ -31,12 +31,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform .2s, box-shadow .2s, opacity .25s;
+    transition: transform .25s cubic-bezier(.22,.61,.36,1), box-shadow .2s, opacity .25s;
     color: #191b23;
+    /* 默认右移，只露出一小部分 */
+    transform: translateX(34px);
 }
 #music-widget-fab:hover {
-    transform: scale(1.08);
+    transform: translateX(0) scale(1.08);
     box-shadow: 0 4px 18px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* 面板打开时 FAB 保持完全可见 */
+#music-widget-fab.keep-visible {
+    transform: translateX(0);
 }
 #music-widget-fab .material-symbols-outlined {
     font-size: 22px;
@@ -628,6 +635,7 @@ html.dark .aplayer .aplayer-lrc p {
             isOpen = !isOpen;
             panel.classList.toggle('open', isOpen);
             backdrop.classList.toggle('open', isOpen);
+            fab.classList.toggle('keep-visible', isOpen);
             if (isOpen && !ap) {
                 // 尝试自动加载已保存的歌单
                 var saved = null;
@@ -640,6 +648,7 @@ html.dark .aplayer .aplayer-lrc p {
             isOpen = true;
             panel.classList.add('open');
             backdrop.classList.add('open');
+            fab.classList.add('keep-visible');
             var saved = '';
             try { saved = localStorage.getItem(STORAGE_KEY) || ''; } catch(e) {}
             input.value = saved;
@@ -676,6 +685,7 @@ html.dark .aplayer .aplayer-lrc p {
         isOpen = false;
         panel.classList.remove('open');
         backdrop.classList.remove('open');
+        fab.classList.remove('keep-visible');
     });
 
     // ── 初始化 ──
