@@ -139,6 +139,26 @@
             background-color: var(--color-api-bg);
             border-color: var(--color-api-border);
         }
+
+        /* ── Dark mode: header area ── */
+        html.dark .header-title {
+            color: #e8e8f0;
+        }
+        html.dark .header-btn {
+            background: rgba(30,32,55,0.6);
+            color: #a0a3b8;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        html.dark .header-btn:hover {
+            background: rgba(50,52,75,0.8);
+            color: #c0c3d8;
+        }
+        html.dark .header-icon {
+            color: #a0a3b8;
+        }
+        html.dark .header-count {
+            color: #898ca8;
+        }
         /* ── 主题切换过渡动画 ── */
         ::view-transition-old(root) { animation: none; }
         ::view-transition-new(root) {
@@ -165,25 +185,25 @@
 <body class="p-6">
     <div class="max-w-7xl mx-auto">
         <div class="flex items-center justify-between mb-2">
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-[#e8e8f0]">图片库</h1>
+            <h1 class="header-title text-2xl font-bold text-gray-800">图片库</h1>
             <div class="flex items-center gap-2">
-                <button onclick="toggleApiDocs()" class="text-xs text-gray-400 hover:text-gray-600 dark:text-[#a0a3b8] dark:hover:text-[#c0c3d8] transition-colors flex items-center gap-1">
+                <button onclick="toggleApiDocs()" class="header-btn text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1 rounded-lg px-2.5 py-1.5 bg-white/70 hover:bg-gray-100">
                     <span class="text-base">&#x3f;</span>
                     <span id="apiDocsLabel">API</span>
                 </button>
-                <button onclick="cycleTheme(event)" class="p-2 rounded-lg bg-white/70 dark:bg-[rgba(30,32,55,0.6)] hover:bg-gray-100 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
-                    <span class="material-symbols-outlined text-[20px] text-gray-600 dark:text-[#a0a3b8]" id="themeIcon">light_mode</span>
+                <button onclick="cycleTheme(event)" class="header-btn p-2 rounded-lg transition-all" title="切换主题" id="themeBtn">
+                    <span class="header-icon material-symbols-outlined text-[20px] text-gray-600" id="themeIcon">light_mode</span>
                 </button>
             </div>
         </div>
-        <p class="text-sm text-gray-500 dark:text-[#a0a3b8] mb-4" id="imageCount">加载中...</p>
+        <p class="header-count text-sm text-gray-500 mb-4" id="imageCount">加载中...</p>
 
         <!-- API 说明 -->
-        <div id="apiDocs" class="hidden mb-6 bg-white/70 dark:bg-[rgba(30,32,55,0.8)] rounded-lg p-4 text-xs text-gray-600 dark:text-[#a0a3b8] border border-gray-200 dark:border-[rgba(255,255,255,0.08)] space-y-2">
-            <div><span class="font-mono font-semibold text-gray-800 dark:text-[#e8e8f0]">GET /api/images</span> — 返回所有图片列表 (JSON，含宽高)</div>
-            <div><span class="font-mono font-semibold text-gray-800 dark:text-[#e8e8f0]">GET /api/random</span> — 重定向到随机一张图片</div>
-            <div><span class="font-mono font-semibold text-gray-800 dark:text-[#e8e8f0]">GET /api/proxy?url=&lt;真实URL&gt;</span> — 代理获取原图</div>
-            <div class="pt-1 text-gray-400 dark:text-[#737686]">示例：<code class="text-gray-500 dark:text-[#8b8ea0]">&lt;img src="/api/random"&gt;</code></div>
+        <div id="apiDocs" class="hidden mb-6 rounded-lg p-4 text-xs space-y-2" style="background:var(--color-api-bg);border:1px solid var(--color-api-border);color:var(--color-text-muted)">
+            <div><span class="font-mono font-semibold" style="color:var(--color-text)">GET /api/images</span> — 返回所有图片列表 (JSON，含宽高)</div>
+            <div><span class="font-mono font-semibold" style="color:var(--color-text)">GET /api/random</span> — 重定向到随机一张图片</div>
+            <div><span class="font-mono font-semibold" style="color:var(--color-text)">GET /api/proxy?url=&lt;真实URL&gt;</span> — 代理获取原图</div>
+            <div class="pt-1" style="color:var(--color-text-muted);opacity:0.7">示例：<code style="color:var(--color-text-muted)">&lt;img src="/api/random"&gt;</code></div>
         </div>
 
         <div id="grid"></div>
