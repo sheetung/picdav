@@ -36,7 +36,7 @@
 
 ```bash
 # 1. 初始化应用配置（从示例复制，按需修改）
-cp picdav.cfg.example picdav.cfg
+cp picdav.yml.example picdav.yml
 
 # 2. 创建虚拟环境并安装依赖
 uv sync
@@ -160,6 +160,7 @@ picdav/
 │   ├── upload.html      # 管理端上传/配置页面（upload.py）
 │   ├── gallery.html     # 图片库展示页，Masonry 瀑布流布局（gallery.py）
 │   └── music_player.html # 音乐播放器浮窗组件（APlayer.js）
+├── picdav.yml.example  # 应用配置模板（cp 后按需修改）
 ├── pyproject.toml    # 项目元数据与依赖声明
 ├── requirements.txt  # pip 依赖锁定
 ├── uv.lock           # uv 依赖锁定

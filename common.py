@@ -2,12 +2,12 @@
 
 import json
 import hashlib
-import configparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
+import yaml
 import requests
 from requests.auth import HTTPBasicAuth
 from cryptography.fernet import Fernet
@@ -16,24 +16,24 @@ from PIL import Image
 CONFIG_FILE = Path(__file__).parent / "config" / "image_uploader.json"
 KEY_FILE = Path(__file__).parent / "config" / ".encryption_key"
 META_CACHE_FILE = Path(__file__).parent / "config" / "image_meta_cache.json"
-PICDAV_CFG = Path(__file__).parent / "picdav.cfg"
+PICDAV_CFG = Path(__file__).parent / "picdav.yml"
 
 
 def load_app_config():
-    """加载 picdav.cfg 应用配置（音乐默认歌单、Umami 统计等）"""
-    cfg = configparser.ConfigParser()
-    cfg.read(PICDAV_CFG, encoding='utf-8')
-    return cfg
+    """加载 picdav.yml 应用配置（音乐默认歌单、Umami 统计等）"""
+    if not PICDAV_CFG.exists():
+        return {}
+    with open(PICDAV_CFG, encoding='utf-8') as f:
+        return yaml.safe_load(f) or {}
 
 
 def register_app_config(app):
     """向 Flask 模板上下文注入 app_config 变量（音乐、Umami 等配置）"""
     cfg = load_app_config()
-    app_cfg = {section: dict(cfg[section]) for section in cfg.sections()}
 
     @app.context_processor
     def inject_app_config():
-        return {'app_config': app_cfg}
+        return {'app_config': cfg}
 
     return app
 
