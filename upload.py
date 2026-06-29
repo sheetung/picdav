@@ -138,7 +138,7 @@ def list_files():
             file_url = f"{server_url}/{filename}"
             files.append({"name": filename, "url": file_url, "size": size, "modified": mtime})
 
-        files.sort(key=lambda x: x.get("modified", ""), reverse=True)
+        files.sort(key=lambda x: x["name"], reverse=True)
 
         # 补充图片宽高（缓存/探测）
         enrich_with_dimensions(files, server_url, username, password)
