@@ -196,7 +196,6 @@
                         远程图片库
                     </h2>
                     <div class="flex items-center gap-3">
-                        <span class="text-xs text-on-surface-variant" id="remotePath">-</span>
                         <button class="px-3 py-1.5 bg-white/40 border border-white/50 rounded-lg text-sm hover:bg-white/60 transition-all flex items-center gap-1.5" onclick="loadRemoteImages()">
                             <span class="material-symbols-outlined text-[16px]">refresh</span>
                             刷新
@@ -269,10 +268,6 @@
                                 <input id="password" class="w-full bg-white/40 border border-white/50 rounded-lg px-4 py-2.5 focus:bg-white/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm pr-10" type="password" placeholder="your_password"/>
                                 <span class="material-symbols-outlined absolute right-3 top-2.5 text-outline cursor-pointer text-[20px] hover:text-primary" onclick="togglePassword()">visibility_off</span>
                             </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-on-surface-variant mb-2">远程路径</label>
-                            <input id="remotePathInput" class="w-full bg-white/40 border border-white/50 rounded-lg px-4 py-2.5 focus:bg-white/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm" type="text" value="/Images/"/>
                         </div>
                     </div>
                     <button class="w-full mt-6 bg-primary py-3 rounded-lg text-on-primary font-bold hover:brightness-110 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98]" onclick="saveConfig()">
@@ -374,7 +369,6 @@
                     document.getElementById('serverUrl').value = config.server_url || '';
                     document.getElementById('username').value = config.username || '';
                     document.getElementById('password').value = config.password || '';
-                    document.getElementById('remotePathInput').value = config.remote_path || '/Images/';
                 });
         }
 
@@ -384,7 +378,6 @@
                 server_url: document.getElementById('serverUrl').value.trim(),
                 username: document.getElementById('username').value.trim(),
                 password: document.getElementById('password').value,
-                remote_path: document.getElementById('remotePathInput').value.trim()
             };
             fetch('/api/image/config', {
                 method: 'POST',
@@ -744,9 +737,6 @@
                         setupLazyLoadObserver();
                     }
 
-                    fetch('/api/image/config').then(r => r.json()).then(config => {
-                        document.getElementById('remotePath').textContent = config.remote_path || '/Images/';
-                    });
                 })
                 .catch(err => {
                     grid.innerHTML = `

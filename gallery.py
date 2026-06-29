@@ -16,7 +16,7 @@ from requests.auth import HTTPBasicAuth
 from flask import Flask, request, jsonify, Response, render_template, redirect
 from PIL import Image
 
-from common import load_config, enrich_with_dimensions, load_meta_cache, save_meta_cache, make_cache_key, register_app_config
+from common import load_config, enrich_with_dimensions, load_meta_cache, save_meta_cache, make_cache_key, register_app_config, get_server_config
 
 from music import create_music_blueprint
 from protect import setup_protection
@@ -83,8 +83,7 @@ def _is_safe_filename(filename):
 def _build_webdav_url(config, filename):
     """根据配置和文件名拼出完整的 WebDAV 下载 URL（仅内部使用，不暴露给前端）"""
     server_url = config.get("server_url", "").rstrip("/")
-    remote_path = config.get("remote_path", "/Images/").strip("/")
-    return f"{server_url}/{remote_path}/{filename}"
+    return f"{server_url}/{filename}"
 
 
 def _fetch_images():
@@ -96,12 +95,11 @@ def _fetch_images():
     server_url = config.get("server_url", "").rstrip("/")
     username = config.get("username", "")
     password = config.get("password", "")
-    remote_path = config.get("remote_path", "/Images/").strip("/")
 
     if not server_url:
         return None, "未配置"
 
-    dir_url = f"{server_url}/{remote_path}/"
+    dir_url = f"{server_url}/"
     headers = {"Depth": "1", "Content-Type": "application/xml"}
     body = """<?xml version="1.0" encoding="utf-8"?>
     <D:propfind xmlns:D="DAV:">
@@ -152,7 +150,7 @@ def _fetch_images():
     raw_images.sort(key=lambda x: x["name"], reverse=True)
 
     # 补上尺寸信息（缓存/探测）
-    images = enrich_with_dimensions(raw_images, server_url, remote_path, username, password)
+    images = enrich_with_dimensions(raw_images, server_url, username, password)
     return images, None
 
 
@@ -206,9 +204,8 @@ def proxy_image():
 
         config = load_config()
         server_url = config.get("server_url", "").rstrip("/")
-        remote_path = config.get("remote_path", "/Images/").strip("/")
 
-        allowed_prefix = f"{server_url}/{remote_path}/"
+        allowed_prefix = f"{server_url}/"
         if not server_url or not _url_is_safe(file_url, allowed_prefix):
             return jsonify({"error": "禁止访问"}), 403
 
@@ -260,9 +257,8 @@ def thumbnail_image():
 
         config = load_config()
         server_url = config.get("server_url", "").rstrip("/")
-        remote_path = config.get("remote_path", "/Images/").strip("/")
 
-        if not server_url or not _url_is_safe(file_url, f"{server_url}/{remote_path}/"):
+        if not server_url or not _url_is_safe(file_url, f"{server_url}/"):
             return jsonify({"error": "禁止访问"}), 403
 
         filename = file_url.rstrip('/').split('/')[-1]
@@ -312,4 +308,5 @@ def _thumbnail_response(file_url, filename):
 
 
 if __name__ == '__main__':
-    app.run(host='192.168.31.238', port=5000, debug=True)
+    host, port = get_server_config("gallery")
+    app.run(host=host, port=port, debug=True)

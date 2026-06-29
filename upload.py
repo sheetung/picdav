@@ -8,7 +8,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 from flask import Flask, request, jsonify, Response, render_template
 
-from common import load_config, save_config, generate_filename, upload_to_webdav, enrich_with_dimensions, register_app_config
+from common import load_config, save_config, generate_filename, upload_to_webdav, enrich_with_dimensions, register_app_config, get_server_config
 
 from music import create_music_blueprint
 from protect import setup_protection
@@ -95,12 +95,11 @@ def list_files():
         server_url = config.get("server_url", "").rstrip("/")
         username = config.get("username", "")
         password = config.get("password", "")
-        remote_path = config.get("remote_path", "/Images/").strip("/")
 
         if not server_url:
             return jsonify({"error": "请先配置WebDAV"}), 400
 
-        dir_url = f"{server_url}/{remote_path}/"
+        dir_url = f"{server_url}/"
         headers = {"Depth": "1", "Content-Type": "application/xml"}
         body = """<?xml version="1.0" encoding="utf-8"?>
         <D:propfind xmlns:D="DAV:">
@@ -136,13 +135,13 @@ def list_files():
             size = int(content_length.text) if content_length is not None else 0
             last_modified = response_elem.find('.//D:getlastmodified', ns)
             mtime = last_modified.text if last_modified is not None else ""
-            file_url = f"{server_url}/{remote_path}/{filename}"
+            file_url = f"{server_url}/{filename}"
             files.append({"name": filename, "url": file_url, "size": size, "modified": mtime})
 
         files.sort(key=lambda x: x.get("modified", ""), reverse=True)
 
         # 补充图片宽高（缓存/探测）
-        enrich_with_dimensions(files, server_url, remote_path, username, password)
+        enrich_with_dimensions(files, server_url, username, password)
 
         return jsonify({"files": files})
     except Exception as e:
@@ -199,4 +198,5 @@ def proxy_image():
 
 
 if __name__ == '__main__':
-    app.run(host='192.168.31.238', port=5001, debug=True)
+    host, port = get_server_config("upload")
+    app.run(host=host, port=port, debug=True)

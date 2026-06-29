@@ -10,11 +10,8 @@ from pathlib import Path
 import yaml
 import requests
 from requests.auth import HTTPBasicAuth
-from cryptography.fernet import Fernet
 from PIL import Image
 
-CONFIG_FILE = Path(__file__).parent / "config" / "image_uploader.json"
-KEY_FILE = Path(__file__).parent / "config" / ".encryption_key"
 META_CACHE_FILE = Path(__file__).parent / "config" / "image_meta_cache.json"
 PICDAV_CFG = Path(__file__).parent / "picdav.yml"
 
@@ -30,59 +27,77 @@ def load_app_config():
 def register_app_config(app):
     """向 Flask 模板上下文注入 app_config 变量（音乐、Umami 等配置）"""
     cfg = load_app_config()
+    # 过滤掉敏感配置，不注入模板上下文
+    safe_cfg = {k: v for k, v in cfg.items() if k not in ("webdav",)}
 
     @app.context_processor
     def inject_app_config():
-        return {'app_config': cfg}
+        return {'app_config': safe_cfg}
 
     return app
 
 
-def _get_cipher():
-    if KEY_FILE.exists():
-        key = KEY_FILE.read_bytes()
-    else:
-        key = Fernet.generate_key()
-        KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-        KEY_FILE.write_bytes(key)
-    return Fernet(key)
-
-
-def encrypt_password(password):
-    if not password:
-        return ""
-    return _get_cipher().encrypt(password.encode()).decode()
-
-
-def decrypt_password(encrypted):
-    if not encrypted:
-        return ""
-    try:
-        return _get_cipher().decrypt(encrypted.encode()).decode()
-    except Exception:
-        return None
+def get_server_config(service="app"):
+    """从 picdav.yml 读取指定服务的监听配置，返回 (host, port)"""
+    cfg = load_app_config()
+    svc = cfg.get("server", {}).get(service, {})
+    if not svc:
+        svc = cfg.get("server", {})  # 兼容扁平结构
+    host = svc.get("host", "127.0.0.1")
+    port = int(svc.get("port", 5000))
+    return host, port
 
 
 def load_config():
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        password = config.get("password", "")
-        if password:
-            decrypted = decrypt_password(password)
-            if decrypted is not None:
-                config["password"] = decrypted
-        return config
-    return {}
+    """从 picdav.yml 读取 WebDAV 配置"""
+    cfg = load_app_config()
+    return cfg.get("webdav", {})
 
 
 def save_config(config):
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    password = config.get("password", "")
-    if password:
-        config["password"] = encrypt_password(password)
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
+    """保存 WebDAV 配置到 picdav.yml（文本替换，保留注释）"""
+    lines = PICDAV_CFG.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    def _webdav_block(prefix=""):
+        return (
+            f"{prefix}webdav:\n"
+            f'{prefix}  # WebDAV 服务器配置（完整 URL，含远程路径）\n'
+            f'{prefix}  server_url: "{config.get("server_url", "")}"\n'
+            f'{prefix}  username: "{config.get("username", "")}"\n'
+            f'{prefix}  password: "{config.get("password", "")}"\n'
+            f"{prefix}\n"
+        )
+
+    # 查找 webdav: 所在行号
+    start = None
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("webdav:"):
+            start = i
+            break
+    else:
+        # 不存在则追加到 server 块之后
+        for i, line in enumerate(lines):
+            if line.lstrip().startswith("music:"):
+                lines.insert(i, _webdav_block())
+                break
+        else:
+            lines.append(_webdav_block())
+        PICDAV_CFG.write_text("".join(lines), encoding="utf-8")
+        return
+
+    # 确定结尾（下一个同层 key 或文件尾）
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    end = start + 1
+    while end < len(lines):
+        if lines[end].strip() == "" or lines[end].lstrip().startswith("#"):
+            end += 1
+            continue
+        if lines[end] and len(lines[end]) - len(lines[end].lstrip()) <= indent:
+            break
+        end += 1
+
+    lines[start:end] = [_webdav_block(lines[start][:indent])]
+    PICDAV_CFG.write_text("".join(lines), encoding="utf-8")
 
 
 # ── 图片尺寸缓存 ──
@@ -141,7 +156,7 @@ def probe_dimensions(url, username, password, max_bytes=262144):
         return None, None
 
 
-def enrich_with_dimensions(images, server_url, remote_path, username, password):
+def enrich_with_dimensions(images, server_url, username, password):
     """为图片列表补上 width / height，优先命中本地缓存，未命中则并发探测
 
     images: [{name, size, modified, ...}]  —— 会原地修改加入 width/height
@@ -166,7 +181,7 @@ def enrich_with_dimensions(images, server_url, remote_path, username, password):
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             fut_map = {}
             for img in need_probe:
-                file_url = f"{server_url}/{remote_path.strip('/')}/{img['name']}"
+                file_url = f"{server_url.rstrip('/')}/{img['name']}"
                 fut = pool.submit(probe_dimensions, file_url, username, password)
                 fut_map[fut] = img
 
@@ -207,14 +222,13 @@ def upload_to_webdav(image_data, filename, config):
     server_url = config.get("server_url", "").rstrip("/")
     username = config.get("username", "")
     password = config.get("password", "")
-    remote_path = config.get("remote_path", "/Images/").strip("/")
 
     if not server_url:
         raise ValueError("请先配置WebDAV服务器地址")
 
-    upload_url = f"{server_url}/{remote_path}/{filename}"
+    upload_url = f"{server_url}/{filename}"
 
-    dir_url = f"{server_url}/{remote_path}/"
+    dir_url = f"{server_url}/"
     try:
         requests.request("MKCOL", dir_url, auth=HTTPBasicAuth(username, password), timeout=10)
     except Exception:

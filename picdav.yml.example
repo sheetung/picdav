@@ -1,6 +1,22 @@
 # picdav 应用配置
 # 修改后重启服务生效
 
+server:
+  upload:
+    # 管理端监听地址和端口
+    host: "127.0.0.1"
+    port: 5001
+  gallery:
+    # 图片浏览监听地址和端口
+    host: "127.0.0.1"
+    port: 5000
+
+webdav:
+  # WebDAV 服务器配置（完整 URL，含远程路径）
+  server_url: "http://example.com/remote.php/dav/files/user/Images"
+  username: ""
+  password: ""
+
 music:
   # 首次打开时自动加载的网易云歌单 ID
   default_playlist_id: "5104642557"

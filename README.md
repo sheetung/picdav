@@ -4,33 +4,32 @@
 
 ## 架构
 
-提供三个独立入口，共用同一份配置（`config/image_uploader.json`，密码使用 Fernet 加密存储）：
+提供两个独立入口，端口及监听地址通过 `picdav.yml` 配置，共用 WebDAV 配置（`config/image_uploader.json`，密码使用 Fernet 加密存储）：
 
-| 服务 | 端口 | 定位 | 说明 |
-|------|------|------|------|
-| **展示页** (`gallery.py`) | **5000** | 纯浏览，适合公网暴露 | Masonry 布局、缩略图代理、随机图片、严格 URL 安全校验 |
-| **管理端** (`upload.py`) | **5001** | 完整功能，建议内网使用 | 上传/配置/图片库/删除 |
-| **独立版** (`app.py`) | **5000** | 二合一，管理+浏览 | 合并 gallery + upload 功能 |
+| 服务 | 定位 | 说明 |
+|------|------|------|
+| **展示页** (`gallery.py`) | 纯浏览，适合公网暴露 | Masonry 布局、缩略图代理、随机图片、严格 URL 安全校验 |
+| **管理端** (`upload.py`) | 完整功能，建议内网使用 | 上传/配置/图片库/删除 |
 
-> `gallery.py` 和 `app.py` 均内置 API Token 防护和音乐播放器。
+> 两者均内置 API Token 防护和音乐播放器。
 
 ## 功能对比
 
-| 功能 | 展示页 (5000) | 管理端 (5001) | 独立版 (5000) |
-|------|:-:|:-:|:-:|
-| 浏览图片 (Masonry) | ✓ | ✓ | ✓ |
-| 上传图片 | - | ✓ | ✓ |
-| 配置 WebDAV | - | ✓ | ✓ |
-| 删除图片 | - | ✓ | ✓ |
-| 图片代理（路径式，不暴露源站） | ✓ | ✓ | ✓ |
-| 缩略图生成 | ✓ | - | - |
-| 随机图片跳转 | ✓ | - | ✓ |
-| 拖拽/粘贴上传 | - | ✓ | ✓ |
-| 网易云音乐播放器 | ✓ | - | ✓ |
-| API Token 防护 | ✓ | - | ✓ |
-| 日间/夜间/跟随系统主题切换 | ✓ | ✓ | ✓ |
-| 主题切换扩散动画 | ✓ | ✓ | ✓ |
-| FAB 自动隐藏到侧边栏 | ✓ | ✓ | ✓ |
+| 功能 | 展示页 (`gallery.py`) | 管理端 (`upload.py`) |
+|------|:-:|:-:|
+| 浏览图片 (Masonry) | ✓ | ✓ |
+| 上传图片 | - | ✓ |
+| 配置 WebDAV | - | ✓ |
+| 删除图片 | - | ✓ |
+| 图片代理（路径式，不暴露源站） | ✓ | ✓ |
+| 缩略图生成 | ✓ | - |
+| 随机图片跳转 | ✓ | - |
+| 拖拽/粘贴上传 | - | ✓ |
+| 网易云音乐播放器 | ✓ | ✓ |
+| API Token 防护 | ✓ | ✓ |
+| 日间/夜间/跟随系统主题切换 | ✓ | ✓ |
+| 主题切换扩散动画 | ✓ | ✓ |
+| FAB 自动隐藏到侧边栏 | ✓ | ✓ |
 
 ## 快速开始
 
@@ -41,17 +40,11 @@ cp picdav.yml.example picdav.yml
 # 2. 创建虚拟环境并安装依赖
 uv sync
 
-# 3. 终端 1：展示页 (http://localhost:5000)
+# 3. 终端 1：展示页 (端口通过 picdav.yml 配置，默认 5000)
 uv run python gallery.py
 
-# 4. 终端 2：管理端 (http://localhost:5001)
+# 4. 终端 2：管理端 (端口通过 picdav.yml 配置，默认 5001)
 uv run python upload.py
-```
-
-或者使用独立版（二合一，端口 5000）：
-
-```bash
-uv run python app.py
 ```
 
 ### 使用 pip
@@ -59,26 +52,46 @@ uv run python app.py
 ```bash
 pip install -r requirements.txt
 
-# 终端 1：展示页 (http://localhost:5000)
+# 终端 1：展示页
 python gallery.py
 
-# 终端 2：管理端 (http://localhost:5001)
+# 终端 2：管理端
 python upload.py
 ```
 
 ## 配置
 
-在管理端（5001）页面中填写 WebDAV 信息：
+### 应用配置（`picdav.yml`）
 
-- **服务器地址** — WebDAV 服务根 URL（如 `https://example.com/remote.php/dav/files/user`）
-- **用户名 / 密码** — WebDAV 认证凭据（密码使用 Fernet 加密存储）
-- **远程路径** — 图片存放目录（默认 `/Images/`）
+服务监听地址和端口、音乐播放器默认歌单、Umami 统计等在 `picdav.yml` 中配置（从 `picdav.yml.example` 复制后按需修改）：
 
-配置保存于 `config/image_uploader.json`。
+```yaml
+server:
+  upload:      # 管理端 (upload.py)
+    host: "127.0.0.1"
+    port: 5001
+  gallery:     # 展示页 (gallery.py)
+    host: "127.0.0.1"
+    port: 5000
+
+webdav:
+  # WebDAV 服务器配置（完整 URL，含远程路径）
+  server_url: "http://example.com/remote.php/dav/files/user/Images"
+  username: ""
+  password: ""
+```
+
+### WebDAV 配置（`picdav.yml` webdav 段）
+
+在管理端页面中填写 WebDAV 信息，或直接编辑 `picdav.yml` 中的 `webdav` 段：
+
+- **服务器地址** — WebDAV 完整 URL（含远程路径，如 `https://example.com/remote.php/dav/files/user/Images`）
+- **用户名 / 密码** — WebDAV 认证凭据
+- 密码以明文存储在 `picdav.yml` 中（该文件已加入 `.gitignore`，不会被提交）
 
 ## 公网部署说明
 
-`gallery.py`（5000）可安全暴露到公网：
+`gallery.py` 可安全暴露到公网：
 
 - **无敏感接口** — 没有配置、删除、上传端点
 - **路径式代理** — `/api/proxy/<文件名>` 和 `/api/thumbnail/<文件名>` 不暴露 WebDAV 源站地址
@@ -144,32 +157,29 @@ python upload.py
 
 ```
 picdav/
-├── app.py             # 独立版（二合一），整合 gallery + upload 功能，端口 5000
-├── gallery.py         # 展示页服务，只读图片浏览，适合公网暴露，端口 5000
-├── upload.py          # 管理端服务，上传/配置/删除，建议内网使用，端口 5001
+├── gallery.py         # 展示页服务，只读图片浏览，适合公网暴露
+├── upload.py          # 管理端服务，上传/配置/删除，建议内网使用
 ├── common.py          # 共享工具库（配置加解密、图片尺寸探测、WebDAV 上传）
 ├── music.py           # 网易云音乐播放器 Flask Blueprint（歌单/音频代理）
 ├── protect.py         # API Token 自动生成与校验（Cookie/Header/查询参数）
 ├── config/
-│   ├── image_uploader.json      # WebDAV 配置（密码 Fernet 加密）
 │   ├── image_meta_cache.json    # 图片尺寸缓存
-│   ├── .encryption_key          # Fernet 加密密钥（首次运行自动生成）
 │   └── .api_token               # API Token（首次运行自动生成）
 ├── templates/
-│   ├── index.html       # 独立版首页（app.py）
 │   ├── upload.html      # 管理端上传/配置页面（upload.py）
 │   ├── gallery.html     # 图片库展示页，Masonry 瀑布流布局（gallery.py）
 │   └── music_player.html # 音乐播放器浮窗组件（APlayer.js）
-├── picdav.yml.example  # 应用配置模板（cp 后按需修改）
-├── pyproject.toml    # 项目元数据与依赖声明
-├── requirements.txt  # pip 依赖锁定
-├── uv.lock           # uv 依赖锁定
-└── README.md         # 项目文档
+├── picdav.yml           # 应用配置（监听地址、端口、WebDAV、音乐、Umami 等）
+├── picdav.yml.example   # 应用配置模板
+├── pyproject.toml       # 项目元数据与依赖声明
+├── requirements.txt     # pip 依赖锁定
+├── uv.lock              # uv 依赖锁定
+└── README.md            # 项目文档
 ```
 
 ## API 概览
 
-### 展示页 / 独立版 — `gallery.py` / `app.py` (端口 5000)
+### 展示页 — `gallery.py`
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -181,7 +191,7 @@ picdav/
 | `/api/music/playlist?id=` | GET | 获取网易云歌单 |
 | `/api/music/song/<id>` | GET | 代理音频流 |
 
-### 管理端 — `upload.py` (端口 5001)
+### 管理端 — `upload.py`
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
