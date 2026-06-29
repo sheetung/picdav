@@ -560,6 +560,30 @@
         });
 
         applyTheme(currentTheme);
+
+        // ==================== 定时切换主题 ====================
+
+        {% set dark_at = app_config.theme.dark_at | default('') %}
+        {% set light_at = app_config.theme.light_at | default('') %}
+        {% if dark_at or light_at %}
+        var DARK_AT = "{{ dark_at }}", LIGHT_AT = "{{ light_at }}";
+        function checkScheduledTheme() {
+            var now = new Date(), hm = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
+            if (DARK_AT && LIGHT_AT) {
+                if (DARK_AT < LIGHT_AT) {
+                    document.documentElement.classList.toggle('dark', hm >= DARK_AT && hm < LIGHT_AT);
+                } else {
+                    document.documentElement.classList.toggle('dark', hm >= DARK_AT || hm < LIGHT_AT);
+                }
+            } else if (DARK_AT) {
+                document.documentElement.classList.toggle('dark', hm >= DARK_AT);
+            } else if (LIGHT_AT) {
+                document.documentElement.classList.toggle('dark', hm < LIGHT_AT);
+            }
+        }
+        checkScheduledTheme();
+        setInterval(checkScheduledTheme, 60000);
+        {% endif %}
     </script>
 
     {% include 'music_player.html' %}

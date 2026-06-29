@@ -79,6 +79,11 @@ webdav:
   server_url: "http://example.com/remote.php/dav/files/user/Images"
   username: ""
   password: ""
+
+theme:
+  # 定时切换日间/夜间主题（留空禁用，24h 格式 "HH:MM"）
+  dark_at: ""
+  light_at: ""
 ```
 
 ### WebDAV 配置（`picdav.yml` webdav 段）
@@ -129,6 +134,10 @@ webdav:
 
 首次打开会自动加载默认歌单（ID: `5104642557`），无需任何配置即可使用。
 
+**VIP 歌曲播放：**
+
+在 `picdav.yml` 的 `music.cookie` 中配置网易云 Cookie（登录 [music.163.com](https://music.163.com) 后从浏览器开发者工具复制），即可播放 VIP 歌曲。**Cookie 必须包含 `MUSIC_U` 字段**，否则无法识别登录状态。留空时仅可播放试听片段。
+
 **技术实现：**
 
 - 后端通过 `music.py`（Flask Blueprint）代理网易云 API，前端不直接请求网易云
@@ -139,6 +148,16 @@ webdav:
 ### 🎨 主题切换
 
 支持三种模式：**日间** / **夜间** / **跟随系统**，切换时使用 View Transitions API 点击扩散动画。
+
+可在 `picdav.yml` 中配置定时切换：
+
+```yaml
+theme:
+  dark_at: "18:00"   # 每天 18:00 自动切夜间
+  light_at: "06:00"  # 每天 06:00 自动切日间
+```
+
+留空则禁用定时切换，仅保留手动切换和跟随系统。
 
 ### 🔒 API Token
 

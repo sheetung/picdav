@@ -48,6 +48,13 @@ def get_server_config(service="app"):
     return host, port
 
 
+def get_music_cookie():
+    """从 picdav.yml 读取网易云音乐 Cookie（用于 VIP 歌曲播放）"""
+    cfg = load_app_config()
+    cookie = cfg.get("music", {}).get("cookie", "")
+    return cookie or ""
+
+
 def load_config():
     """从 picdav.yml 读取 WebDAV 配置"""
     cfg = load_app_config()

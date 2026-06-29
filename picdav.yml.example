@@ -20,8 +20,15 @@ webdav:
 music:
   # 首次打开时自动加载的网易云歌单 ID
   default_playlist_id: "5104642557"
+  # 网易云 Cookie（必须包含 MUSIC_U，登录后从浏览器复制；留空仅可播试听）
+  cookie: ""
 
 umami:
   # Umami 网站统计（留空禁用）
   script_url: ""
   website_id: ""
+
+theme:
+  # 定时切换日间/夜间主题（留空禁用，24h 格式 "HH:MM"）
+  dark_at: ""
+  light_at: ""

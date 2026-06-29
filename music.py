@@ -22,9 +22,9 @@ _playlist_cache = {}
 _CACHE_TTL = 300  # 5 分钟
 
 
-def _netease_headers():
+def _netease_headers(cookie=""):
     """网易云 API 通用请求头"""
-    return {
+    headers = {
         'User-Agent': (
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
             'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -32,10 +32,17 @@ def _netease_headers():
         ),
         'Referer': 'https://music.163.com/',
     }
+    if cookie:
+        headers['Cookie'] = cookie
+    return headers
 
 
-def create_music_blueprint():
-    """创建并返回一个 Flask Blueprint，包含音乐相关的路由。"""
+def create_music_blueprint(cookie=""):
+    """创建并返回一个 Flask Blueprint，包含音乐相关的路由。
+
+    参数:
+        cookie: 网易云登录 Cookie（含 MUSIC_U，用于 VIP 歌曲）
+    """
     bp = Blueprint('music', __name__)
 
     # ──────────────────────────────────────────────
@@ -57,11 +64,10 @@ def create_music_blueprint():
         if cached and (now - cached['time']) < _CACHE_TTL:
             return jsonify(cached['data'])
 
-        # 请求网易云 API
         try:
             resp = requests.get(
                 f'https://music.163.com/api/v3/playlist/detail?id={playlist_id}',
-                headers=_netease_headers(), timeout=15
+                headers=_netease_headers(cookie), timeout=15
             )
         except requests.RequestException as e:
             return jsonify({"error": f"请求网易云失败: {e}"}), 502
@@ -112,27 +118,56 @@ def create_music_blueprint():
     @bp.route('/api/music/song/<int:song_id>')
     @require_token
     def get_song(song_id):
-        """通过网易云 outer URL 获取 CDN 地址，再代理音频流。"""
+        """获取歌曲 CDN 地址并代理音频流。"""
 
-        h = _netease_headers()
+        h = _netease_headers(cookie)
+        cdn_url = None
 
-        # Step 1: 获取 CDN 真实地址 (302 重定向)
+        # outer/url 重定向方式（带 Cookie 可播 VIP 歌曲）
         try:
             head_resp = requests.get(
                 f'https://music.163.com/song/media/outer/url?id={song_id}.mp3',
                 headers=h, timeout=15, allow_redirects=False
             )
+            if head_resp.status_code in (301, 302, 303, 307, 308):
+                cdn_url = head_resp.headers.get('Location')
         except requests.RequestException as e:
             return jsonify({"error": str(e)}), 502
 
-        cdn_url = None
-        if head_resp.status_code in (301, 302, 303, 307, 308):
-            cdn_url = head_resp.headers.get('Location')
+        # outer/url 返回 404 时，尝试 enhance API（需 Cookie）
+        if (not cdn_url or 'music.163.com/404' in cdn_url) and cookie:
+            try:
+                api_resp = requests.post(
+                    'https://music.163.com/api/song/enhance/player/url',
+                    headers={**h, 'Content-Type': 'application/x-www-form-urlencoded'},
+                    data=f'ids=[{song_id}]&br=320000', timeout=15,
+                )
+                api_data = api_resp.json()
+                urls = api_data.get('data', [])
+                if urls and urls[0].get('url') and api_data.get('code') == 200:
+                    cdn_url = urls[0]['url']
+            except Exception:
+                pass
 
         if not cdn_url:
-            return jsonify({"error": "无法获取音频 CDN 地址"}), 502
+            msg = "无法获取音频 CDN 地址"
+            if cookie:
+                msg += "（Cookie 可能过期或缺少 MUSIC_U）"
+            return jsonify({"error": msg}), 502
 
-        # Step 2: 把客户端的 Range header 透传给 CDN
+        if '404' in cdn_url.split('/')[-1]:
+            return jsonify({"error": "歌曲无法播放（Cookie 缺少 MUSIC_U 或已过期）"}), 403
+
+        return _proxy_cdn(cdn_url)
+
+
+    # ──────────────────────────────────────────────
+    #  CDN 代理（透传音频流，支持 Range）
+    # ──────────────────────────────────────────────
+
+    def _proxy_cdn(cdn_url):
+        """代理 CDN 音频流，支持 Range 断点续传"""
+        h = _netease_headers(cookie)
         range_h = request.headers.get('Range')
         if range_h:
             h['Range'] = range_h
@@ -147,13 +182,11 @@ def create_music_blueprint():
         if cdn_resp.status_code not in (200, 206):
             return jsonify({"error": f"CDN 返回 {cdn_resp.status_code}"}), 502
 
-        # 透传 CDN 响应头 (Content-Type 单独处理，避免 charset 干扰)
         passthrough = {}
         for key in ('Content-Range', 'Content-Length'):
             if key in cdn_resp.headers:
                 passthrough[key] = cdn_resp.headers[key]
 
-        # 清理 Content-Type（CDN 有时会带 charset 后缀）
         ct = cdn_resp.headers.get('Content-Type', 'audio/mpeg').split(';')[0].strip()
         if not ct.startswith('audio/'):
             ct = 'audio/mpeg'
