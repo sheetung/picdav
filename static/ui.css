@@ -1,0 +1,244 @@
+/* ════════════════════════════════════════════════════════════════
+   picdav 共享 UI 样式 — Header 悬浮胶囊 + 沉浸式 Lightbox
+   5000 图库页 (gallery.html) 与 5001 管理页 (index.html) 共同引用
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Header 右上角统一功能按钮（磨砂胶囊） ── */
+.header-actions {
+    position: relative;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.58);
+    box-shadow:
+        0 8px 30px rgba(80, 70, 120, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.header-btn {
+    height: 36px;
+    min-width: 36px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    padding: 0 9px;
+    border: 1px solid rgba(229, 231, 235, 0.8);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.7);
+
+    color: #9ca3af;
+    font-size: 12px;
+    line-height: 1;
+    text-decoration: none;
+
+    transition:
+        background-color 0.2s,
+        border-color 0.2s,
+        color 0.2s,
+        transform 0.15s;
+}
+
+.header-btn:hover {
+    color: #4b5563;
+    background: rgba(243, 244, 246, 0.95);
+    transform: translateY(-1px);
+}
+
+.header-btn:active {
+    transform: translateY(0) scale(0.94);
+}
+
+/* 文字按钮统一宽度（随机/API），API↔关闭 切换时宽度不变 */
+.header-btn-text {
+    width: 72px;
+    gap: 4px;
+}
+
+/* GitHub、主题按钮固定为正方形 */
+.header-btn-icon {
+    width: 36px;
+    padding: 0;
+}
+
+.header-btn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.header-btn .material-symbols-outlined {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    line-height: 20px;
+}
+
+/* 固定标签区域，API 和关闭不会引起布局跳动 */
+#apiDocsLabel {
+    display: inline-block;
+    width: 30px;
+    text-align: center;
+}
+
+html.dark .header-btn {
+    background: rgba(30, 32, 55, 0.6);
+    color: #a0a3b8;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .header-btn:hover {
+    background: rgba(50, 52, 75, 0.8);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .header-actions {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(30, 32, 55, 0.55);
+    box-shadow:
+        0 8px 30px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* 窄屏：压缩胶囊，避免与标题挤压溢出 */
+@media (max-width: 480px) {
+    .header-actions { gap: 3px; padding: 3px; }
+    .header-btn { padding: 0 6px; }
+    .header-btn-text { width: 60px; gap: 3px; }
+    .header-btn-icon { width: 34px; padding: 0; }
+}
+
+/* ── Lightbox 沉浸式浏览 ── */
+#lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    touch-action: pan-y;
+}
+#lightbox.open { display: block; }
+
+.lightbox-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    color: #fff;
+    background: linear-gradient(rgba(0,0,0,0.4), transparent);
+}
+.lightbox-title {
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.lightbox-count {
+    margin-left: auto;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.85);
+    white-space: nowrap;
+}
+.lightbox-top-actions {
+    display: flex;
+    gap: 8px;
+}
+.lb-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+}
+.lb-btn:hover { background: rgba(255,255,255,0.22); }
+.lb-btn:active { transform: scale(0.94); }
+.lb-btn .material-symbols-outlined { font-size: 20px; }
+
+.lightbox-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 64px 24px;
+    cursor: zoom-in;
+}
+#lightboxImg {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 6px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.3s ease;
+    cursor: inherit;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+#lightboxImg.loaded { opacity: 1; }
+#lightboxImg.zoomed {
+    transform: scale(1.8);
+    cursor: zoom-out;
+}
+
+.lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 7;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: background 0.2s, transform 0.15s;
+}
+.lightbox-nav:hover { background: rgba(255,255,255,0.22); }
+.lightbox-nav:active { transform: translateY(-50%) scale(0.92); }
+.lightbox-prev { left: 16px; }
+.lightbox-next { right: 16px; }
+.lightbox-nav .material-symbols-outlined { font-size: 26px; }
+
+/* 移动端：隐藏悬浮箭头，靠左右滑动切换 */
+@media (max-width: 640px) {
+    .lightbox-stage { padding: 64px 16px 20px; }
+    .lightbox-nav { display: none; }
+    .lightbox-top { padding: 12px 14px; }
+    .lb-btn { width: 32px; height: 32px; }
+}

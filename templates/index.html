@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="/static/ui.css"/>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -167,12 +168,12 @@
                     </h1>
                     <p class="text-sm text-on-surface-variant mt-1">上传图片到 WebDAV 服务器</p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <a href="https://github.com/sheetung/picdav" target="_blank" class="text-gray-400 hover:text-gray-600 dark:text-[#a0a3b8] dark:hover:text-white transition-colors" title="GitHub 开源地址">
-                        <svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                <div class="header-actions">
+                    <a href="https://github.com/sheetung/picdav" target="_blank" rel="noopener noreferrer" class="header-btn header-btn-icon" title="GitHub 开源地址" aria-label="打开 GitHub 仓库">
+                        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                     </a>
-                    <button onclick="cycleTheme(event)" class="p-2 rounded-lg bg-white/40 dark:bg-[rgba(30,32,55,0.6)] hover:bg-white/60 dark:hover:bg-[rgba(50,52,75,0.6)] transition-all" title="切换主题" id="themeBtn">
-                        <span class="material-symbols-outlined text-[20px] text-on-surface-variant dark:text-[#a0a3b8]" id="themeIcon">light_mode</span>
+                    <button type="button" onclick="cycleTheme(event)" class="header-btn header-btn-icon" title="切换主题" id="themeBtn" aria-label="切换主题">
+                        <span class="material-symbols-outlined" id="themeIcon" aria-hidden="true">light_mode</span>
                     </button>
                 </div>
             </div>
@@ -320,36 +321,33 @@
         </div>
     </div>
 
-    <!-- Lightbox -->
-    <div id="lightbox" class="fixed inset-0 z-[100] hidden" onclick="closeLightbox()">
-        <div class="absolute inset-0 bg-black/70 backdrop-blur-md"></div>
-        <div class="relative flex items-center justify-center h-full p-8" onclick="event.stopPropagation()">
-            <button class="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors z-10" onclick="closeLightbox()">
-                <span class="material-symbols-outlined">close</span>
-            </button>
-            <div class="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/40 rounded-full text-white text-sm" id="lightboxCounter">1 / 10</div>
-            <button id="lightboxPrev" class="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors z-10" onclick="lightboxPrev()">
-                <span class="material-symbols-outlined text-[28px]">chevron_left</span>
-            </button>
-            <button id="lightboxNext" class="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors z-10" onclick="lightboxNext()">
-                <span class="material-symbols-outlined text-[28px]">chevron_right</span>
-            </button>
-            <div class="relative max-w-4xl max-h-full">
-                <img id="lightboxImg" src="" alt="" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"/>
-                <div class="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm rounded-b-lg px-4 py-3 flex flex-col items-center gap-2">
-                    <span id="lightboxName" class="text-white text-sm truncate max-w-full"></span>
-                    <div class="flex items-center gap-2">
-                        <button class="px-3 py-1.5 bg-white/20 hover:bg-white/40 rounded text-white text-sm flex items-center gap-1.5 transition-colors" onclick="copyRemoteUrl(lightboxCurrentUrl)">
-                            <span class="material-symbols-outlined text-[16px]">link</span>
-                            复制链接
-                        </button>
-                        <button class="px-3 py-1.5 bg-white/20 hover:bg-white/40 rounded text-white text-sm flex items-center gap-1.5 transition-colors" onclick="window.open('/api/image/proxy?url=' + encodeURIComponent(lightboxCurrentUrl), '_blank')">
-                            <span class="material-symbols-outlined text-[16px]">open_in_new</span>
-                            新窗口
-                        </button>
-                    </div>
-                </div>
+    <!-- Lightbox 沉浸式浏览 -->
+    <div id="lightbox" role="dialog" aria-modal="true" aria-label="图片预览">
+        <div class="lightbox-top">
+            <span class="lightbox-title" id="lightboxName"></span>
+            <span class="lightbox-count" id="lightboxCounter"></span>
+            <div class="lightbox-top-actions">
+                <button type="button" class="lb-btn" id="lightboxCopy" title="复制图片链接" aria-label="复制图片链接">
+                    <span class="material-symbols-outlined" aria-hidden="true">link</span>
+                </button>
+                <button type="button" class="lb-btn" id="lightboxDownload" title="下载原图" aria-label="下载原图">
+                    <span class="material-symbols-outlined" aria-hidden="true">download</span>
+                </button>
+                <button type="button" class="lb-btn" id="lightboxClose" title="关闭 (Esc)" aria-label="关闭">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
             </div>
+        </div>
+
+        <button type="button" class="lightbox-nav lightbox-prev" id="lightboxPrev" title="上一张 (←)" aria-label="上一张">
+            <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+        </button>
+        <button type="button" class="lightbox-nav lightbox-next" id="lightboxNext" title="下一张 (→)" aria-label="下一张">
+            <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+        </button>
+
+        <div class="lightbox-stage" id="lightboxStage" onclick="if (event.target === this) closeLightbox()">
+            <img id="lightboxImg" src="" alt="" draggable="false"/>
         </div>
     </div>
 
@@ -612,60 +610,118 @@
             });
         }
 
-        // ==================== Lightbox ====================
+        // ==================== Lightbox（沉浸式浏览，与图库一致） ====================
 
         let lightboxCurrentUrl = '';
-        let lightboxCurrentIndex = 0;
+        let lightboxState = { index: 0, zoomed: false };
 
-        function showLightbox(url, name, index) {
-            lightboxCurrentUrl = url;
-            lightboxCurrentIndex = index !== undefined ? index : remoteImages.findIndex(f => f.url === url);
-            document.getElementById('lightboxImg').src = '/api/image/proxy?url=' + encodeURIComponent(url);
-            document.getElementById('lightboxName').textContent = name;
-            document.getElementById('lightboxCounter').textContent = `${lightboxCurrentIndex + 1} / ${remoteImages.length}`;
-            document.getElementById('lightbox').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
+        function proxyUrl(url) {
+            return '/api/image/proxy?url=' + encodeURIComponent(url);
+        }
+
+        function currentRemoteFile() {
+            return remoteImages[lightboxState.index] || null;
+        }
+
+        function renderLightbox() {
+            const file = currentRemoteFile();
+            if (!file) return;
+
+            const imgEl = document.getElementById('lightboxImg');
+            imgEl.classList.remove('loaded', 'zoomed');
+            lightboxState.zoomed = false;
+            imgEl.src = proxyUrl(file.url);
+            imgEl.onload = () => imgEl.classList.add('loaded');
+
+            document.getElementById('lightboxName').textContent = file.name;
+            document.getElementById('lightboxCounter').textContent = `${lightboxState.index + 1} / ${remoteImages.length}`;
             updateLightboxNav();
         }
 
+        function showLightbox(url, name, index) {
+            lightboxCurrentUrl = url;
+            lightboxState.index = index !== undefined ? index : remoteImages.findIndex(f => f.url === url);
+            renderLightbox();
+            document.getElementById('lightbox').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
         function closeLightbox() {
-            document.getElementById('lightbox').classList.add('hidden');
+            document.getElementById('lightbox').classList.remove('open');
             document.getElementById('lightboxImg').src = '';
             document.body.style.overflow = '';
         }
 
         function lightboxPrev() {
-            if (lightboxCurrentIndex > 0) {
-                lightboxCurrentIndex--;
-                const file = remoteImages[lightboxCurrentIndex];
-                lightboxCurrentUrl = file.url;
-                document.getElementById('lightboxImg').src = '/api/image/proxy?url=' + encodeURIComponent(file.url);
-                document.getElementById('lightboxName').textContent = file.name;
-                document.getElementById('lightboxCounter').textContent = `${lightboxCurrentIndex + 1} / ${remoteImages.length}`;
-                updateLightboxNav();
+            if (lightboxState.index > 0) {
+                lightboxState.index--;
+                lightboxCurrentUrl = remoteImages[lightboxState.index].url;
+                renderLightbox();
             }
         }
 
         function lightboxNext() {
-            if (lightboxCurrentIndex < remoteImages.length - 1) {
-                lightboxCurrentIndex++;
-                const file = remoteImages[lightboxCurrentIndex];
-                lightboxCurrentUrl = file.url;
-                document.getElementById('lightboxImg').src = '/api/image/proxy?url=' + encodeURIComponent(file.url);
-                document.getElementById('lightboxName').textContent = file.name;
-                document.getElementById('lightboxCounter').textContent = `${lightboxCurrentIndex + 1} / ${remoteImages.length}`;
-                updateLightboxNav();
+            if (lightboxState.index < remoteImages.length - 1) {
+                lightboxState.index++;
+                lightboxCurrentUrl = remoteImages[lightboxState.index].url;
+                renderLightbox();
             }
         }
 
         function updateLightboxNav() {
-            document.getElementById('lightboxPrev').style.display = lightboxCurrentIndex > 0 ? '' : 'none';
-            document.getElementById('lightboxNext').style.display = lightboxCurrentIndex < remoteImages.length - 1 ? '' : 'none';
+            document.getElementById('lightboxPrev').style.display = lightboxState.index > 0 ? '' : 'none';
+            document.getElementById('lightboxNext').style.display = lightboxState.index < remoteImages.length - 1 ? '' : 'none';
         }
+
+        function toggleZoom() {
+            const imgEl = document.getElementById('lightboxImg');
+            lightboxState.zoomed = !lightboxState.zoomed;
+            imgEl.classList.toggle('zoomed', lightboxState.zoomed);
+        }
+
+        function copyCurrentLink() {
+            const file = currentRemoteFile();
+            if (!file) return;
+            copyRemoteUrl(proxyUrl(file.url));
+        }
+
+        function downloadCurrent() {
+            const file = currentRemoteFile();
+            if (!file) return;
+            const a = document.createElement('a');
+            a.href = proxyUrl(file.url);
+            a.download = file.name;
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        // 顶部栏 / 导航 / 复制 / 下载
+        document.getElementById('lightboxPrev').addEventListener('click', lightboxPrev);
+        document.getElementById('lightboxNext').addEventListener('click', lightboxNext);
+        document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+        document.getElementById('lightboxCopy').addEventListener('click', copyCurrentLink);
+        document.getElementById('lightboxDownload').addEventListener('click', downloadCurrent);
+
+        // 双击放大 / 缩小
+        document.getElementById('lightboxImg').addEventListener('dblclick', toggleZoom);
+
+        // 移动端左右滑动切换
+        let lightboxTouchX = null;
+        document.getElementById('lightboxStage').addEventListener('touchstart', e => {
+            lightboxTouchX = e.touches[0].clientX;
+        }, { passive: true });
+        document.getElementById('lightboxStage').addEventListener('touchend', e => {
+            if (lightboxTouchX === null) return;
+            const dx = e.changedTouches[0].clientX - lightboxTouchX;
+            if (Math.abs(dx) > 50) (dx < 0 ? lightboxNext() : lightboxPrev());
+            lightboxTouchX = null;
+        }, { passive: true });
 
         document.addEventListener('keydown', e => {
             const lb = document.getElementById('lightbox');
-            if (lb.classList.contains('hidden')) return;
+            if (!lb.classList.contains('open')) return;
             if (e.key === 'Escape') closeLightbox();
             else if (e.key === 'ArrowLeft') lightboxPrev();
             else if (e.key === 'ArrowRight') lightboxNext();
