@@ -4,6 +4,7 @@
 """
 
 from pathlib import Path
+import hashlib
 import xml.etree.ElementTree as ET
 from io import BytesIO
 from urllib.parse import urlparse, unquote
@@ -25,6 +26,12 @@ app = Flask(__name__)
 setup_protection(app)
 register_app_config(app)
 app.register_blueprint(create_music_blueprint(get_music_cookie()))
+
+
+# 浏览器端图片资源使用长期 immutable 缓存。
+# 资源 URL 会携带由 WebDAV 元数据生成的版本号，因此同名文件被替换后 URL 会变化，
+# 浏览器会自动拉取新版本；未变化的图片则无需重复下载。
+BROWSER_CACHE_SECONDS = 365 * 24 * 60 * 60
 
 
 # ── URL 安全校验 ──
@@ -86,10 +93,17 @@ def _build_webdav_url(config, filename):
     return f"{server_url}/{filename}"
 
 
+def _asset_version(filename, size, mtime, etag):
+    """生成稳定的资源版本号，用于浏览器长期缓存失效控制。"""
+    raw = f"{filename}|{size}|{mtime}|{etag}".encode("utf-8", errors="ignore")
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
 def _fetch_images():
     """从WebDAV获取图片列表，返回 [{name, size, width, height, proxy_url, thumb_url}]
 
-    proxy_url / thumb_url 使用纯文件名路径（不暴露内部 WebDAV 地址）
+    proxy_url / thumb_url 使用纯文件名路径（不暴露内部 WebDAV 地址）。
+    URL 带版本参数，便于浏览器长期缓存且在文件更新后自动失效。
     """
     config = load_config()
     server_url = config.get("server_url", "").rstrip("/")
@@ -106,6 +120,7 @@ def _fetch_images():
         <D:prop>
             <D:getlastmodified/>
             <D:getcontentlength/>
+            <D:getetag/>
             <D:resourcetype/>
         </D:prop>
     </D:propfind>"""
@@ -135,10 +150,15 @@ def _fetch_images():
         size = int(content_length.text) if content_length is not None else 0
         last_modified = elem.find('.//D:getlastmodified', ns)
         mtime = last_modified.text if last_modified is not None else ""
+        etag_elem = elem.find('.//D:getetag', ns)
+        etag = etag_elem.text if etag_elem is not None else ""
+
+        # 同一个版本的图片 URL 永久稳定；同名文件被替换后版本号变化。
+        version = _asset_version(filename, size, mtime, etag)
 
         # 使用纯文件名路径，不暴露内部 WebDAV 地址
-        proxy = f"/api/proxy/{filename}"
-        thumb = f"/api/thumbnail/{filename}"
+        proxy = f"/api/proxy/{filename}?v={version}"
+        thumb = f"/api/thumbnail/{filename}?v={version}"
         raw_images.append({
             "name": filename,
             "size": size,
@@ -168,7 +188,11 @@ def list_images():
     if limit > 0:
         images = images[offset:offset + limit]
 
-    return jsonify({"images": images, "total": total})
+    # 列表本身不长期缓存，保证新上传/替换的图片能及时被发现；
+    # 真正的大流量图片资源由版本化 URL + immutable 缓存处理。
+    response = jsonify({"images": images, "total": total})
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @app.route('/api/random', methods=['GET'])
@@ -230,7 +254,9 @@ def _proxy_response(file_url):
     return Response(
         resp.content,
         content_type=resp.headers.get('Content-Type', 'image/jpeg'),
-        headers={'Cache-Control': 'public, max-age=3600'}
+        headers={
+            'Cache-Control': f'public, max-age={BROWSER_CACHE_SECONDS}, immutable',
+        }
     )
 
 
@@ -300,7 +326,7 @@ def _thumbnail_response(file_url, filename):
         buf.getvalue(),
         content_type='image/jpeg',
         headers={
-            'Cache-Control': 'public, max-age=3600',
+            'Cache-Control': f'public, max-age={BROWSER_CACHE_SECONDS}, immutable',
             'X-Image-Width': str(orig_w),
             'X-Image-Height': str(orig_h),
         }
